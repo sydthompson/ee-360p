@@ -8,7 +8,7 @@ public class PSort{
 
   public static void parallelSort(int[] A, int begin, int end){
 
-
+      (new RunnablePSort(A, begin, end)).run();
   }
 
 }
@@ -71,7 +71,7 @@ class RunnablePSort implements Runnable {
 
     if((end - begin) <= 16) {
       // insertion sort
-      Arrays.sort(A, begin, end + 1);
+      Arrays.sort(A, begin, end);
       // for(int i = begin; i < end; i++) {
       //   int j = 1;
       //   while(j > begin && A[j - 1] > A[j]) {
