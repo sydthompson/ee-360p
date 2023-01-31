@@ -38,6 +38,7 @@ public class PMerge {
         } catch (Exception e) {
             System.err.println(e);
         }
+        threadPool.shutdown();
     }
 }
 

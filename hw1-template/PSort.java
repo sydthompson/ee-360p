@@ -8,9 +8,9 @@ public class PSort{
 
   public static void parallelSort(int[] A, int begin, int end){
 
-      //(new RunnablePSort(A, begin, end)).run();
+      (new RunnablePSort(A, begin, end)).run();
 
-      (new ForkJoinPSort(A, begin, end)).compute();
+      //(new ForkJoinPSort(A, begin, end)).compute();
 
   }
 
@@ -37,8 +37,7 @@ public class PSort{
   }
 
   static void insertionSort(int[] arr, int begin, int end) {
-    int n = begin - end;
-    for(int i = begin+1; i < n; i++) {
+    for(int i = begin+1; i < end+1; i++) {
       int key = arr[i];
       int j = i - 1;
 
@@ -101,19 +100,16 @@ class RunnablePSort implements Runnable {
   public static void parallelSort(int[] A, int begin, int end){
     if(begin >= end) {
       return;
-    }
-    // else if((end - begin) <= 16) {
-    //   // insertion sort
-    //   Arrays.sort(A, begin, end);
-    //   return;
-    // }
-    else {
+    } else if((end - begin) <= 16) {
+      synchronized(A) {
+        PSort.insertionSort(A, begin, end);
+      }
+      return;
+    } else {
 
       int pivot = PSort.partition(A, begin, end);
-      //System.out.println("pivot: " + pivot);
 
       parallelSort(A, begin, pivot - 1);
-      //parallelSort(A, pivot + 1, end);
       RunnablePSort right = new RunnablePSort(A, pivot + 1, end);
       right.run();
     }
