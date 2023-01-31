@@ -36,6 +36,21 @@ public class PSort{
     return i+1;
   }
 
+  static void insertionSort(int[] arr, int begin, int end) {
+    int n = begin - end;
+    for(int i = begin+1; i < n; i++) {
+      int key = arr[i];
+      int j = i - 1;
+
+      while(j >= begin && arr[j] > key) {
+        arr[j+1] = arr[j];
+        j = j-1;
+      }
+      arr[j+1] = key;
+
+    }
+  }
+
 }
 
 class ForkJoinPSort extends RecursiveAction {
@@ -60,10 +75,12 @@ class ForkJoinPSort extends RecursiveAction {
   @Override
   protected void compute() {
     if( begin_idx < end_idx) {
-      int pivot = PSort.partition(arr, begin_idx, end_idx);
 
-      invokeAll(new ForkJoinPSort(arr, begin_idx, pivot - 1), 
-                new ForkJoinPSort(arr, pivot + 1, end_idx));
+        int pivot = PSort.partition(arr, begin_idx, end_idx);
+
+        invokeAll(new ForkJoinPSort(arr, begin_idx, pivot - 1), 
+                  new ForkJoinPSort(arr, pivot + 1, end_idx));
+      
     }
   }
 

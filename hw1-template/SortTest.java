@@ -12,7 +12,7 @@ public class SortTest {
     int[] A3 = {13, 59, 24, 18, 33, 20, 11, 11, 13, 50, 10999, 97};
     verifyParallelSort(A3);
 
-    int[] big_case = new int[1000];
+    int[] big_case = new int[2000];
     for(int i =0; i < big_case.length; i++) {
       big_case[i] = new Random().nextInt(250);
     }
