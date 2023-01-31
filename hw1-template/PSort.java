@@ -8,9 +8,9 @@ public class PSort{
 
   public static void parallelSort(int[] A, int begin, int end){
 
-      (new RunnablePSort(A, begin, end)).run();
+      //(new RunnablePSort(A, begin, end)).run();
 
-      //(new ForkJoinPSort(A, begin, end)).compute();
+      (new ForkJoinPSort(A, begin, end)).compute();
 
   }
 
@@ -75,10 +75,17 @@ class ForkJoinPSort extends RecursiveAction {
   protected void compute() {
     if( begin_idx < end_idx) {
 
+      if(end_idx - begin_idx <= 16) {
+        synchronized(arr) {
+          PSort.insertionSort(arr, begin_idx, end_idx);
+        }
+      }
+      else {
         int pivot = PSort.partition(arr, begin_idx, end_idx);
 
         invokeAll(new ForkJoinPSort(arr, begin_idx, pivot - 1), 
                   new ForkJoinPSort(arr, pivot + 1, end_idx));
+      }
       
     }
   }
