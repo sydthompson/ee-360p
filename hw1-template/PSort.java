@@ -8,34 +8,32 @@ public class PSort{
 
   public static void parallelSort(int[] A, int begin, int end){
 
-      (new RunnablePSort(A, begin, end)).run();
+      //(new RunnablePSort(A, begin, end)).run();
 
-      //(new ForkJoinPSort(A, begin, end)).compute();
+      (new ForkJoinPSort(A, begin, end)).compute();
 
   }
 
-  static void swap(int[] arr, int i, int j)
+  static int partition(int[] arr, int begin, int end)
   {
-      int temp = arr[i];
-      arr[i] = arr[j];
-      arr[j] = temp;
-  }
+    int pivot = arr[end];
+    int i = (begin-1);
 
-  static int partition(int[] arr, int low, int high)
-  {
-      int pivot = arr[high];
+    for (int j = begin; j < end; j++) {
+        if (arr[j] <= pivot) {
+            i++;
 
-      int i = (low - 1);
+            int temp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = temp;
+        }
+    }
 
-      for (int j = low; j <= high - 1; j++) {
+    int temp = arr[i+1];
+    arr[i+1] = arr[end];
+    arr[end] = temp;
 
-          if (arr[j] < pivot) {
-              i++;
-              swap(arr, i, j);
-          }
-      }
-      swap(arr, i + 1, high);
-      return (i + 1);
+    return i+1;
   }
 
 }
@@ -44,41 +42,29 @@ class ForkJoinPSort extends RecursiveAction {
 
   private int[] arr;
   private int begin_idx;
-  private int end_idk;
+  private int end_idx;
 
   public ForkJoinPSort(int[] A, int begin, int end) {
     arr = A;
     begin_idx = begin;
-    end_idk = Math.min(end, A.length - 1);
+    end_idx = Math.min(end, A.length - 1);
   }
 
   public static void parallelSort(int[] A, int begin, int end){
-
-    int pivot = PSort.partition(A, begin, end);
-
-    if((end - begin) <= 16) {
-      // insertion sort
-      Arrays.sort(A, begin, end);
-    }
-
-    else {
-
-      ForkJoinPool poolJoin = new ForkJoinPool();
-
-      ForkJoinPSort left = new ForkJoinPSort(A, begin, pivot);
-      ForkJoinPSort right = new ForkJoinPSort(A, pivot + 1, end);
-
-      poolJoin.invoke(left);
-      poolJoin.invoke(right);
-
-    }
-
+      ForkJoinPool myPool = new ForkJoinPool();
+      myPool.invoke(new ForkJoinPSort(A, begin, end));
+      myPool.shutdown();
 
   }
 
   @Override
   protected void compute() {
-    parallelSort(arr, begin_idx, end_idk);
+    if( begin_idx < end_idx) {
+      int pivot = PSort.partition(arr, begin_idx, end_idx);
+
+      invokeAll(new ForkJoinPSort(arr, begin_idx, pivot - 1), 
+                new ForkJoinPSort(arr, pivot + 1, end_idx));
+    }
   }
 
 }
@@ -96,47 +82,26 @@ class RunnablePSort implements Runnable {
   }
 
   public static void parallelSort(int[] A, int begin, int end){
-
-    int pivot = PSort.partition(A, begin, end);
-    if(begin == end) {
+    if(begin >= end) {
       return;
     }
-    if((end - begin) <= 16) {
-      // insertion sort
-      Arrays.sort(A, begin, end);
-      return;
-  
-    }
-
+    // else if((end - begin) <= 16) {
+    //   // insertion sort
+    //   Arrays.sort(A, begin, end);
+    //   return;
+    // }
     else {
-      RunnablePSort left = new RunnablePSort(A, begin, pivot);
+
+      int pivot = PSort.partition(A, begin, end);
+      //System.out.println("pivot: " + pivot);
+
+      parallelSort(A, begin, pivot - 1);
+      //parallelSort(A, pivot + 1, end);
       RunnablePSort right = new RunnablePSort(A, pivot + 1, end);
-      left.run();
       right.run();
     }
   }
-
-  public static int get_partition(int begin, int end, int[] A) {
-    int m = begin - 1;
-    end = Math.min(end, A.length-1);
-    int x = A[end];
-    for(int n = begin; n < end; n++) {
-      if(A[n] < x) {
-        m++;
-        int temp = A[m];
-        A[m] = A[n];
-        A[n] = temp;
-      }
-    }
-    m++;
-    int temp = A[m];
-    A[m] = A[end];
-    A[end] = temp;
-
-    return m;
-  }
   
-
   @Override
   public void run() {
     parallelSort(arr, begin_idx, end_idk);
