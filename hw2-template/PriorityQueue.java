@@ -107,7 +107,7 @@ public class PriorityQueue {
                                         next.lock.lock();
                                         current.lock.unlock();
                                         current = next;
-                                }
+                                } current = next;
                         }
                         return -1;
 
