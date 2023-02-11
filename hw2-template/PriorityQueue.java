@@ -32,7 +32,7 @@ public class PriorityQueue {
         // otherwise, returns -1 if the name is already present in the list.
         // This method blocks when the list is full.
                 int idx = 0;
-               try {
+                try {
                         if(search(name) != -1) {
                                 return -1;
                         }
@@ -97,27 +97,19 @@ public class PriorityQueue {
 
                         Node current = head;
                         current.lock.lock();
-                        
-                        boolean found = false;
-                        Node next = head.next;
-                        while(next != null && !found) {
-                                try {
+                        while(current != null) {
+                                Node next = current.next;
+                                if(current.name.equals(name)) {
+                                        current.lock.unlock();
+                                        return idx;
+                                } idx += 1;
+                                if(next != null) {
                                         next.lock.lock();
-                                } finally {
-                                        if(current.name.equals(name)) {
-                                                found=true;
-                                        } else {
-                                                idx +=1;
-                                        }
-                                       current.lock.unlock(); 
+                                        current.lock.unlock();
+                                        current = next;
                                 }
-                                current = next;
-                                next = current.next;
                         }
-                        if(!found && !current.name.equals(name)) {
-                            idx = -1;
-                        }
-                        current.lock.unlock();
+                        return -1;
 
                 } catch(Exception e) {
                         System.out.println(e);
@@ -131,14 +123,13 @@ public class PriorityQueue {
                 String name = "";
                 capacityLock.lock();
                 try {
-                        while(0 == size) {
+                        if(0 == size) {
                                 notEmpty.await();
                         }
 
                         head.lock.lock();
                         name=head.name;
 
-                        capacityLock.lock();
 
                         if(1 == size) {
                                 head = null;
