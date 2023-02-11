@@ -56,6 +56,7 @@ public class PriorityQueue {
                                                 if(current.next.priority < priority) {
                                                         toInsert.next = current.next;
                                                         current.next = toInsert;
+                                                        idx -= 1;
                                                         inserted = true;
                                                 } 
                                                 Node next= current.next;
