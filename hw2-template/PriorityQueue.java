@@ -31,62 +31,55 @@ public class PriorityQueue {
         // Returns the current position in the list where the name was inserted;
         // otherwise, returns -1 if the name is already present in the list.
         // This method blocks when the list is full.
-                int idx=0;
-                capacityLock.lock();
-                try {
+                int idx = 0;
+               try {
                         if(search(name) != -1) {
                                 return -1;
                         }
-                        if(maxSize == size) {
-                                notFull.await();
-                        }
-                        capacityLock.unlock();
-
                         Node toInsert = new Node(name, priority, null);
-                        Node current = head;
 
-                        current.lock.lock();
-
-                        if(head == null) {
-                                head = toInsert;
-                                current.lock.unlock();
-                        }
-
-                        else {
-                                boolean inserted = false;
-                                Node next = head.next;
-                                while(next != null && !inserted) {
-                                        try {
-                                                next.lock.lock();
-                                        } finally {
-                                                if(next.priority < priority) {
-                                                        current.next = toInsert;
-                                                        toInsert.next = next;
-                                                        inserted = true;
-                                                        size += 1;
-                                                        next.lock.unlock();
-                                                }
-                                                current.lock.unlock(); 
-                                        }
-
-                                        current = next;
-                                        next = current.next;
-                                        idx += 1;
-                                }
-                                if(!inserted) {
-                                        idx += 1;
-                                        current.next = toInsert;
-                                        current.lock.unlock();
-                                }
-                        }
                         capacityLock.lock();
-                        notEmpty.signal();
-                        capacityLock.unlock();
+                        if(size == 0) {
+                                head = toInsert;
+                                size += 1;
+                                notEmpty.signal();
+                                capacityLock.unlock();
+                        } else {
+                                capacityLock.unlock();
 
-                } catch(Exception e) {
-                        System.out.println(e.getStackTrace());
-                } 
-                return idx;
+                                Node current = head;
+                                current.lock.lock();
+                                boolean inserted = false;
+                                while(current != null && !inserted) {
+                                        if(current.next != null) {
+                                                current.next.lock.lock();
+                                                if(current.next.priority < priority) {
+                                                        toInsert.next = current.next;
+                                                        current.next = toInsert;
+                                                        inserted = true;
+                                                } 
+                                                Node next= current.next;
+                                                current.lock.unlock();
+                                                current = next;
+                                                idx += 1;                                                
+
+                                        } else {
+                                                current.next = toInsert;
+                                                current.lock.unlock();
+                                                inserted = true;
+                                        }
+                                }
+
+                                capacityLock.lock();
+                                size += 1;
+                                notEmpty.signal();
+                                capacityLock.unlock();
+                        }
+
+               } catch(Exception e) {
+                        System.out.println(e);
+               }
+               return idx;
 	}
 
 	public int search(String name) {
@@ -126,7 +119,7 @@ public class PriorityQueue {
                         current.lock.unlock();
 
                 } catch(Exception e) {
-                        System.out.println(e.getStackTrace());
+                        System.out.println(e);
                 } 
                 return idx;
 	}
@@ -159,10 +152,18 @@ public class PriorityQueue {
 
                         
                 } catch(Exception e) {
-                        System.out.println(e.getStackTrace());
+                        System.out.println(e);
                 }
                 return name;
 	}
+
+        public void print() {
+                Node current = head;
+                while(current != null) {
+                        System.out.println(current.name + " " + current.priority + ", ");
+                        current = current.next;
+                }
+        }
 
         class Node {
 
@@ -177,6 +178,7 @@ public class PriorityQueue {
                         this.next = next;
                         this.lock = new ReentrantLock();
                 }
+
 
 
         }
