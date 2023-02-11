@@ -1,157 +1,115 @@
-public class CyclicBarrierTest implements Runnable {
-	final static int numParties = 5;
-	static int waitCount = 0;
-	static int leaveCount = 0;
-	static boolean barrierBroken = false;
+public class BathroomTest implements Runnable {
 
-	final CyclicBarrier barrier;
-	int numRounds;
+	final FairUnifanBathroom bathroom;
+	final College mySchool;
+	final Action myAction;
 
-	public static void reset() {
-		waitCount = -1;
-		leaveCount = -1;
-		barrierBroken = false;
+	enum College {
+		UT,
+		OU
 	}
 
-	public CyclicBarrierTest(CyclicBarrier barrier, int numRounds) {
-		this.barrier = barrier;
-		this.numRounds = numRounds;
+	enum Action {
+		ENTER,
+		LEAVE
+	}
+
+	public BathroomTest(FairUnifanBathroom bathroom, College mySchool, Action myAction) {
+		this.bathroom = bathroom;
+		this.mySchool = mySchool;
+		this.myAction = myAction;
 	}
 
 	public void run() {
-		int index = -1;
-
-		for (int round = 0; round < numRounds; ++round) {
-			synchronized(CyclicBarrier.class) {
-				if(round<waitCount)
-					barrierBroken = true;
-				waitCount = Integer.max(waitCount, round);
-			}
-			// System.out.println("Thread " + Thread.currentThread().getId() + " is waiting round:" + round);
-			try {
-				index = barrier.await();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			synchronized(CyclicBarrier.class) {
-				if(round<leaveCount)
-					barrierBroken = true;
-				leaveCount = Integer.max(leaveCount, round);
-			}
-			// System.out.println("Thread " + Thread.currentThread().getId() + " is leaving round:" + round);
+		try {
+			if (mySchool == College.OU && myAction == Action.ENTER) bathroom.enterBathroomOU();
+			else if (mySchool == College.OU && myAction == Action.LEAVE) bathroom.leaveBathroomOU();
+			else if (mySchool == College.UT && myAction == Action.ENTER) bathroom.enterBathroomUT();
+			else if (mySchool == College.UT && myAction == Action.LEAVE) bathroom.leaveBathroomUT();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 
 	public static void main(String[] args) throws InterruptedException {
-
-		int numRounds = 20;
-
-		CyclicBarrier barrier;
-		// if (args[0].startsWith("s"))
-		// 	barrier = new SemaphoreCyclicBarrier(numParties);
-		// else
-		barrier = new MonitorCyclicBarrier(numParties);
-
-		Thread[] t = new Thread[numParties];
-
-
-
+		FairUnifanBathroom bathroom = new FairUnifanBathroom();
+		// Tests mainly verify no hanging should occur
+		// AKA no leaves will be called that do not correspond to an enter
+		// Threads are started sequentially, so they should execute in the order they are joined
 
 		/*
-		 * 1. ACTIVE BARRIER
-		 * Many threads run in parallel
-		 * Each thread calls barrier.await() 'numRounds' number of times
-		 * If the running threads block - there's an issue with the behavior of the barrier
+		 *
+		 * 1. PoC for join and leave
+		 * Simulate a 1-capacity bathroom
+		 * Verify basic join and leave functionality
+		 * No capacity testing
+		 *
 		 */
-		reset();
-		for (int i = 0; i < numParties; ++i) {
-			t[i] = new Thread(new CyclicBarrierTest(barrier, numRounds));
-		}
-		for (int i = 0; i < numParties; ++i) {
+		// Test 1
+		Thread[] t = new Thread[4];
+		t[0] = new Thread(new BathroomTest(bathroom, College.UT, Action.ENTER));
+		t[1] = new Thread(new BathroomTest(bathroom, College.OU, Action.ENTER));
+		t[2] = new Thread(new BathroomTest(bathroom, College.UT, Action.LEAVE));
+		t[3] = new Thread(new BathroomTest(bathroom, College.OU, Action.LEAVE));
+		for (int i = 0; i < t.length; ++i) {
 			t[i].start();
 		}
-		for (int i = 0; i < numParties; ++i) {
+		for (int i = 0; i < t.length; ++i) {
 			t[i].join();
 		}
-		if(barrierBroken) {
-			System.out.println("Test 1 Failed - Barrier was broken during execution");
-		}
-		else {
-			System.out.println("Test 1 Succeeded!");
-		}
+		bathroom.bathroomStatus();
+		System.out.println("Test 1 passed!");
 
+		// Test 2
+		Thread[] v = new Thread[15];
+		for (int i = 0; i < 7; ++i) {
+			v[i] = new Thread(new BathroomTest(bathroom, College.UT, Action.ENTER));
+		}
+		v[7] = new Thread(new BathroomTest(bathroom, College.OU, Action.ENTER));
+		for (int i = 8; i < 15; ++i) {
+			v[i] = new Thread(new BathroomTest(bathroom, College.UT, Action.LEAVE));
+		}
+		for (int i = 0; i < v.length; ++i) {
+			v[i].start();
+		}
+		for (int i = 0; i < v.length; ++i) {
+			v[i].join();
+		}
+		bathroom.bathroomStatus();
+		System.out.println("Test 2 passed!");
 
-
-		/*
-		 * 2. DEACTIVATED BARRIER
-		 * The barrier is deactivated
-		 * Many threads run in parallel
-		 * Each thread iterates and calls barrier.await() a distinct number of times.
-		 * With an active barrier - the running threads will wait forever since not enough threads can reach the barrier in later rounds
-		 * With a deactivated barrier - this should work fine
-		 */
-		barrier.deactivate();
-		for (int i = 0; i < numParties; ++i) {
-			t[i] = new Thread(new CyclicBarrierTest(barrier, i));
+		// Test 3
+		Thread[] u = new Thread[16];
+		for (int i = 0; i < 3; ++i) {
+			u[i] = new Thread(new BathroomTest(bathroom, College.UT, Action.ENTER));
 		}
-		for (int i = 0; i < numParties; ++i) {
-			t[i].start();
+		Thread.sleep(1000);
+		for (int i = 3; i < 6; ++i) {
+			u[i] = new Thread(new BathroomTest(bathroom, College.UT, Action.LEAVE));
 		}
-		for (int i = 0; i < numParties; ++i) {
-			t[i].join();
+		Thread.sleep(1000);
+		for (int i = 6; i < 9; ++i) {
+			u[i] = new Thread(new BathroomTest(bathroom, College.OU, Action.ENTER));
 		}
-		System.out.println("Test 2 Succeeded!");
-
-
-
-		/*
-		 * 3. MIDWAY BARRIER DEACTIVATION
-		 * The barrier is reactivated.
-		 * Many threads run in parallel
-		 * Each thread iterates and calls barrier.await() a distinct number of times - with an active barrier the threads would block forever.
-		 * Before waiting for the threads to complete - the barrier is deactivated
-		 * Deactivation should
-		 * 		a. nullify the barrier,
-		 * 		b. release any waiting threads
-		 * If the barrier is deactivated as expected - the threads should be able to execute to completion
-		 */
-		barrier.activate();
-		for (int i = 0; i < numParties; ++i) {
-			t[i] = new Thread(new CyclicBarrierTest(barrier, i));
+		Thread.sleep(1000);
+		for (int i = 9; i < 11; ++i) {
+			u[i] = new Thread(new BathroomTest(bathroom, College.UT, Action.ENTER));
 		}
-		for (int i = 0; i < numParties; ++i) {
-			t[i].start();
+		Thread.sleep(1000);
+		for (int i = 11; i < 14; ++i) {
+			u[i] = new Thread(new BathroomTest(bathroom, College.OU, Action.LEAVE));
 		}
-		barrier.deactivate();
-		for (int i = 0; i < numParties; ++i) {
-			t[i].join();
+		Thread.sleep(1000);
+		for (int i = 14; i < 16; ++i) {
+			u[i] = new Thread(new BathroomTest(bathroom, College.UT, Action.LEAVE));
 		}
-		System.out.println("Test 3 Succeeded!");
-
-
-
-
-		/*
-		 * 4. ACTIVE BARRIER 2.0
-		 * This is identical to the first test case above
-		 * This serves as a check to ensure that deactivating the barrier in the middle of its execution in case 3 did not break it in any way
-		 */
-		reset();
-		barrier.activate();
-		for (int i = 0; i < numParties; ++i) {
-			t[i] = new Thread(new CyclicBarrierTest(barrier, numRounds));
+		for (int i = 0; i < u.length; ++i) {
+			u[i].start();
 		}
-		for (int i = 0; i < numParties; ++i) {
-			t[i].start();
+		for (int i = 0; i < u.length; ++i) {
+			u[i].join();
 		}
-		for (int i = 0; i < numParties; ++i) {
-			t[i].join();
-		}
-		if(barrierBroken) {
-			System.out.println("Test 4 Failed - Barrier was broken during execution");
-		}
-		else {
-			System.out.println("Test 4 Succeeded!");
-		}
+		bathroom.bathroomStatus();
+		System.out.println("Test 3 passed!");
 	}
 }
