@@ -1,5 +1,5 @@
 /*
- * EID's of group members
+ * mhv352, st34596
  * 
  */
 import java.util.concurrent.Semaphore; // for implementation using Semaphores
