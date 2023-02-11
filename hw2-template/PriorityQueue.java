@@ -39,17 +39,20 @@ public class PriorityQueue {
                         }
                         capacityLock.lock();
                         if(maxSize == size) {
-                                capacityLock.unlock();
                                 notFull.await();
                         }
-                        
+                        capacityLock.unlock();
+
                         Node toInsert = new Node(name, priority, null);
                         Node current = head;
+
                         current.lock.lock();
+
                         if(head == null) {
                                 head = toInsert;
                                 current.lock.unlock();
                         }
+
                         else {
                                 boolean inserted = false;
                                 Node next = head.next;
@@ -96,6 +99,8 @@ public class PriorityQueue {
                                 capacityLock.unlock();
                                 return -1;
                         }
+                        capacityLock.unlock();
+
                         Node current = head;
                         current.lock.lock();
                         
@@ -133,22 +138,24 @@ public class PriorityQueue {
                 capacityLock.lock();
                 try {
                         while(0 == size) {
-                                capacityLock.unlock();
                                 notEmpty.await();
                         }
+
                         head.lock.lock();
                         name=head.name;
+
                         capacityLock.lock();
+
                         if(1 == size) {
-                                capacityLock.unlock();
                                 head = null;
                         } else {
-                                capacityLock.unlock();
                                 head.next.lock.lock();
                                 head = head.next;
                                 head.lock.unlock();
                                 size -=1;
                         }    
+                        capacityLock.unlock();
+
                         
                 } catch(Exception e) {
                         System.out.println(e.getStackTrace());
@@ -164,14 +171,12 @@ public class PriorityQueue {
                 int priority;
                 Lock lock;
                 Node next;
-                Condition isLocked;
 
                 public Node(String name, int priority, Node next) {
                         this.name = name;
                         this.priority = priority;
                         this.next = next;
                         this.lock = new ReentrantLock();
-                        this.isLocked = this.lock.newCondition();
                 }
 
 
