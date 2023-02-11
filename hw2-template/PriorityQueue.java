@@ -32,12 +32,11 @@ public class PriorityQueue {
         // otherwise, returns -1 if the name is already present in the list.
         // This method blocks when the list is full.
                 int idx=0;
-
+                capacityLock.lock();
                 try {
                         if(search(name) != -1) {
                                 return -1;
                         }
-                        capacityLock.lock();
                         if(maxSize == size) {
                                 notFull.await();
                         }
@@ -80,12 +79,13 @@ public class PriorityQueue {
                                         current.lock.unlock();
                                 }
                         }
+                        capacityLock.lock();
+                        notEmpty.signal();
+                        capacityLock.unlock();
 
                 } catch(Exception e) {
                         System.out.println(e.getStackTrace());
-                } finally {
-                        notEmpty.signal();
-                }
+                } 
                 return idx;
 	}
 
@@ -153,14 +153,13 @@ public class PriorityQueue {
                                 head = head.next;
                                 head.lock.unlock();
                                 size -=1;
-                        }    
+                        }  
+                        notFull.signal();   
                         capacityLock.unlock();
 
                         
                 } catch(Exception e) {
                         System.out.println(e.getStackTrace());
-                }finally {
-                       notFull.signal(); 
                 }
                 return name;
 	}
