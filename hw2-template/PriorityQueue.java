@@ -12,6 +12,7 @@ public class PriorityQueue {
 
         int maxSize;
         int size;
+
         ReadWriteLock sizeLock = new ReentrantReadWriteLock();
         Lock readSizeLock = sizeLock.readLock();
         Lock writeSizeLock = sizeLock.writeLock();
@@ -19,12 +20,13 @@ public class PriorityQueue {
         Condition notFull = writeSizeLock.newCondition();
         Condition notEmpty = writeSizeLock.newCondition();
 
-        Node dummyHead = new Node("", 0, null);
-
+        // In case the priority levels of the dummy nodes will be used
+        // Assign values outside of the priority range of 0-9
+        Node dummyTail = new Node("", 10, null);
+        Node dummyHead = new Node("", -1, dummyTail);
 
 	public PriorityQueue(int maxSize) {
                 // Creates a Priority queue with maximum allowed size as capacity
-
                 this.maxSize = maxSize;
                 this.size = 0;
 	}
@@ -36,7 +38,6 @@ public class PriorityQueue {
                 // This method blocks when the list is full.
 
                 readSizeLock.lock();
-                dummyHead.lock.lock();
                 try {
                         if(search(name) != -1) {
                                 return -1;
@@ -51,7 +52,6 @@ public class PriorityQueue {
 
                         Node toInsert = new Node(name, priority, null);
                         int idx = 0;
-
 
                         Node prev = dummyHead;
                         prev.lock.lock();
