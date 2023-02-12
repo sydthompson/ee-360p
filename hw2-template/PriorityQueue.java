@@ -1,7 +1,8 @@
-import java.util.LinkedList;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 // st34596
@@ -10,150 +11,171 @@ import java.util.concurrent.locks.ReentrantLock;
 public class PriorityQueue {
 
         int maxSize;
-        Lock capacityLock;
         int size;
-        Node head;
-        Condition notEmpty;
-        Condition notFull;
+        ReadWriteLock sizeLock = new ReentrantReadWriteLock();
+        Lock readSizeLock = sizeLock.readLock();
+        Lock writeSizeLock = sizeLock.writeLock();
+
+        Condition notFull = writeSizeLock.newCondition();
+        Condition notEmpty = writeSizeLock.newCondition();
+
+        Node dummyHead = new Node("", 0, null);
+
 
 	public PriorityQueue(int maxSize) {
-        // Creates a Priority queue with maximum allowed size as capacity
+                // Creates a Priority queue with maximum allowed size as capacity
+
                 this.maxSize = maxSize;
-                this.capacityLock = new ReentrantLock();
-                this.notEmpty = capacityLock.newCondition();
-                this.notFull = capacityLock.newCondition();
-                this.head = null;
                 this.size = 0;
 	}
 
 	public int add(String name, int priority) {
-        // Adds the name with its priority to this queue.
-        // Returns the current position in the list where the name was inserted;
-        // otherwise, returns -1 if the name is already present in the list.
-        // This method blocks when the list is full.
-                int idx = 0;
+                // Adds the name with its priority to this queue.
+                // Returns the current position in the list where the name was inserted;
+                // otherwise, returns -1 if the name is already present in the list.
+                // This method blocks when the list is full.
+
+                readSizeLock.lock();
+                dummyHead.lock.lock();
                 try {
                         if(search(name) != -1) {
                                 return -1;
                         }
+
+                        readSizeLock.lock();
+
+                        if(size == maxSize) {
+                                notFull.await();
+                        }
+                        readSizeLock.unlock();
+
                         Node toInsert = new Node(name, priority, null);
+                        int idx = 0;
 
-                        capacityLock.lock();
-                        if(size == 0) {
-                                head = toInsert;
-                                size += 1;
-                                notEmpty.signal();
-                                capacityLock.unlock();
-                        } else {
-                                capacityLock.unlock();
 
-                                Node current = head;
-                                current.lock.lock();
-                                boolean inserted = false;
-                                while(current != null && !inserted) {
-                                        if(current.next != null) {
-                                                current.next.lock.lock();
-                                                if(current.next.priority < priority) {
-                                                        toInsert.next = current.next;
-                                                        current.next = toInsert;
-                                                        idx -= 1;
-                                                        inserted = true;
-                                                } 
-                                                Node next= current.next;
-                                                current.lock.unlock();
-                                                current = next;
-                                                idx += 1;                                                
+                        Node prev = dummyHead;
+                        Node curr = dummyHead.next;
 
-                                        } else {
-                                                current.next = toInsert;
-                                                current.lock.unlock();
-                                                inserted = true;
-                                        }
-                                }
-
-                                capacityLock.lock();
-                                size += 1;
-                                notEmpty.signal();
-                                capacityLock.unlock();
+                        while(curr != null && curr.priority > priority) {
+                                prev.lock.unlock();
+                                prev = curr;
+                                curr = curr.next;
+                                idx += 1;
+                                
                         }
 
-               } catch(Exception e) {
+                        prev.next = toInsert;
+                        toInsert.next = curr;
+                        
+
+                        if(curr != null) {
+                                curr.lock.unlock();
+                        }
+
+                        writeSizeLock.lock();
+                        size += 1;
+                        notEmpty.signal();
+                        writeSizeLock.unlock();
+                        return idx;
+
+
+                } catch (Exception e) {
                         System.out.println(e);
-               }
-               return idx;
+                        e.printStackTrace();
+
+                } finally {
+                        readSizeLock.unlock();
+                        dummyHead.lock.unlock();
+
+                }
+                return -1;
+              
 	}
 
 	public int search(String name) {
         // Returns the position of the name in the list;
         // otherwise, returns -1 if the name is not found.
-                int idx=0;
+                dummyHead.lock.lock();
                 try {
-                        capacityLock.lock();
-                        if(0 == size) {
-                                capacityLock.unlock();
-                                return -1;
-                        }
-                        capacityLock.unlock();
+                        int idx = 0;
 
-                        Node current = head;
-                        current.lock.lock();
+                        Node prev = dummyHead;
+                        Node current = dummyHead.next;
+
                         while(current != null) {
-                                Node next = current.next;
+                                current.lock.lock();
                                 if(current.name.equals(name)) {
+                                        prev.lock.unlock();
                                         current.lock.unlock();
                                         return idx;
-                                } idx += 1;
-                                if(next != null) {
-                                        next.lock.lock();
-                                        current.lock.unlock();
-                                        current = next;
-                                } current = next;
+                                }
+                                prev.lock.unlock();
+                                prev = current;
+                                current = current.next;
+                                idx += 1;
                         }
+                        prev.lock.unlock();
+                        
+
                         return -1;
 
-                } catch(Exception e) {
+                } catch (Exception e) {
                         System.out.println(e);
-                } 
-                return idx;
+                        e.printStackTrace();
+                } finally {
+                        dummyHead.lock.unlock();
+                }
+                return -1;
+                
 	}
 
 	public String getFirst() {
         // Retrieves and removes the name with the highest priority in the list,
         // or blocks the thread if the list is empty.
-                String name = "";
-                capacityLock.lock();
+                dummyHead.lock.lock();
+                readSizeLock.lock();
                 try {
-                        if(0 == size) {
+                        if(size == 0) {
                                 notEmpty.await();
                         }
+                        readSizeLock.unlock();
 
-                        head.lock.lock();
-                        name=head.name;
+                        Node toRemove = dummyHead.next;
+                        toRemove.lock.lock();
 
+                        Node afterRemove = toRemove.next;
 
-                        if(1 == size) {
-                                head = null;
-                        } else {
-                                head.next.lock.lock();
-                                head = head.next;
-                                head.lock.unlock();
-                                size -=1;
-                        }  
-                        notFull.signal();   
-                        capacityLock.unlock();
+                        afterRemove.lock.lock();
 
+                        dummyHead.next = afterRemove;
+
+                        writeSizeLock.lock();
+                        size -= 1;
+                        notFull.signal();
+                        writeSizeLock.unlock();
+
+                        dummyHead.lock.unlock();
+                        afterRemove.lock.lock();
                         
-                } catch(Exception e) {
+                        return toRemove.name;
+
+
+                } catch (Exception e) {
                         System.out.println(e);
+                } finally {
+                        if(dummyHead.lock.isHeldByCurrentThread())
+                                dummyHead.lock.unlock();
+                        readSizeLock.unlock();
                 }
-                return name;
+                return "";
+                
 	}
 
-        public void print() {
-                Node current = head;
-                while(current != null) {
-                        System.out.println(current.name + " " + current.priority + ", ");
-                        current = current.next;
+        void print() {
+                Node curr = dummyHead.next;
+                while(curr != null) {
+                        System.out.println(curr.name + ", " + curr.priority);
+                        curr = curr.next;
                 }
         }
 
@@ -161,7 +183,7 @@ public class PriorityQueue {
 
                 String name;
                 int priority;
-                Lock lock;
+                ReentrantLock lock;
                 Node next;
 
                 public Node(String name, int priority, Node next) {
@@ -170,7 +192,6 @@ public class PriorityQueue {
                         this.next = next;
                         this.lock = new ReentrantLock();
                 }
-
 
 
         }
