@@ -13,10 +13,9 @@ public class PriorityQueueTest implements Runnable{
 
     public void run() {
         System.out.println(String.format("Added [%s, %d] at: %d", name, priority, priorityQueue.add(name, priority)));
-       // priorityQueue.print();
-        if(priority % 3==0) {
-            System.out.println("removed first: " + priorityQueue.getFirst());
-        }
+//        if(priority % 3==0) {
+//            System.out.println("removed first: " + priorityQueue.getFirst());
+//        }
         // System.out.println(String.format("Added [%s, %d] at: %d", "temp", 2, priorityQueue.add("temp", 2)));
         // priorityQueue.print();
 
@@ -43,18 +42,18 @@ public class PriorityQueueTest implements Runnable{
     }
 
     public static void main(String[] args) throws InterruptedException {
-        PriorityQueue priorityQueue = new PriorityQueue(10);
-        int numParties = 5;
+        PriorityQueue priorityQueue = new PriorityQueue(200);
+        int numParties = 150;
         Thread[] t = new Thread[numParties];
         for (int i = 0; i < numParties; ++i) {
-			t[i] = new Thread(new PriorityQueueTest(priorityQueue, "" + i, i));
+			t[i] = new Thread(new PriorityQueueTest(priorityQueue, "" + i, (int) (Math.random() * 9) + 1));
 		}
 		for (int i = 0; i < numParties; ++i) {
 			t[i].start();
 		}
 		for (int i = 0; i < numParties; ++i) {
 			t[i].join();
-            priorityQueue.print();
+            //priorityQueue.print();
             System.out.println(priorityQueue.size);
 		}
     }

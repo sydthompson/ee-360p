@@ -13,17 +13,15 @@ public class PriorityQueue {
         int maxSize;
         int size;
 
-        ReadWriteLock sizeLock = new ReentrantReadWriteLock();
-        Lock readSizeLock = sizeLock.readLock();
-        Lock writeSizeLock = sizeLock.writeLock();
+        ReentrantLock sizeLock = new ReentrantLock();
 
-        Condition notFull = writeSizeLock.newCondition();
-        Condition notEmpty = writeSizeLock.newCondition();
+        Condition notFull = sizeLock.newCondition();
+        Condition notEmpty = sizeLock.newCondition();
 
         // In case the priority levels of the dummy nodes will be used
         // Assign values outside of the priority range of 0-9
-        Node dummyTail = new Node("", 10, null);
-        Node dummyHead = new Node("", -1, dummyTail);
+        Node dummyTail = new Node("", -1, null);
+        Node dummyHead = new Node("", 10, dummyTail);
 
 	public PriorityQueue(int maxSize) {
                 // Creates a Priority queue with maximum allowed size as capacity
@@ -37,18 +35,15 @@ public class PriorityQueue {
                 // otherwise, returns -1 if the name is already present in the list.
                 // This method blocks when the list is full.
 
-                readSizeLock.lock();
+                sizeLock.lock();
                 try {
-                        if(search(name) != -1) {
-                                return -1;
-                        }
-                        System.out.println("done with search");
+                        if (search(name) != -1) return -1;
 
-
-                        if(size == maxSize) {
-                                notFull.await();
-                        }
-                        readSizeLock.unlock();
+                        if (size == maxSize) notFull.await();
+                        // Confirmed we can add the element, change the size while we still have the lock
+                        size += 1;
+                        notEmpty.signal();
+                        sizeLock.unlock();
 
                         Node toInsert = new Node(name, priority, null);
                         int idx = 0;
@@ -58,39 +53,29 @@ public class PriorityQueue {
 
                         Node curr = dummyHead.next;
 
-                        while(curr != null && curr.priority > priority) {
+                        while(curr.priority != -1 && curr.priority > priority) {
                                 curr.lock.lock();
+                                // Let go of previous node lock before acquiring next lock
                                 prev.lock.unlock();
 
                                 prev = curr;
                                 curr = curr.next;
                                 idx += 1;
-                                
+
                         }
 
                         prev.next = toInsert;
                         toInsert.next = curr;
-                        
+                        // We are the
+                        prev.lock.unlock();
 
-                        if(curr != null && curr.lock.isHeldByCurrentThread()) {
-                                curr.lock.unlock();
-                        }
-
-                        writeSizeLock.lock();
-                        size += 1;
-                        notEmpty.signal();
-                        writeSizeLock.unlock();
                         return idx;
-
-
                 } catch (Exception e) {
                         System.out.println(e);
                         e.printStackTrace();
-
                 } finally {
                         if(dummyHead.lock.isHeldByCurrentThread())
                                 dummyHead.lock.unlock();
-
                 }
                 return -1;
               
@@ -99,51 +84,53 @@ public class PriorityQueue {
 	public int search(String name) {
         // Returns the position of the name in the list;
         // otherwise, returns -1 if the name is not found.
-                dummyHead.lock.lock();
-                try {
-                        int idx = 0;
+        dummyHead.lock.lock();
+        try {
+                int idx = 0;
 
-                        Node prev = dummyHead;
-                        Node current = dummyHead.next;
+                Node prev = dummyHead;
+                // Current starts at the actual first item in the queue
+                Node current = dummyHead.next;
 
-                        while(current != null) {
-                                current.lock.lock();
-                                if(current.name.equals(name)) {
-                                        prev.lock.unlock();
-                                        current.lock.unlock();
-                                        return idx;
-                                }
+                while(current.priority != -1) {
+                        // Current and prev should be locked
+                        current.lock.lock();
+                        if (current.name.equals(name)) {
                                 prev.lock.unlock();
-                                prev = current;
-                                current = current.next;
-                                idx += 1;
+                                current.lock.unlock();
+                                return idx;
                         }
                         prev.lock.unlock();
-                        
-
-                        return -1;
-
-                } catch (Exception e) {
-                        System.out.println(e);
-                        e.printStackTrace();
-                } finally {
-                        dummyHead.lock.unlock();
+                        prev = current;
+                        current = current.next;
+                        idx += 1;
                 }
+                prev.lock.unlock();
+
                 return -1;
+        } catch (Exception e) {
+                System.out.println(e);
+                e.printStackTrace();
+        } finally {
+                if(dummyHead.lock.isHeldByCurrentThread())
+                        dummyHead.lock.unlock();
+        }
+        return -1;
                 
 	}
 
 	public String getFirst() {
         // Retrieves and removes the name with the highest priority in the list,
         // or blocks the thread if the list is empty.
-                dummyHead.lock.lock();
-                readSizeLock.lock();
+                sizeLock.lock();
                 try {
-                        if(size == 0) {
-                                notEmpty.await();
-                        }
-                        readSizeLock.unlock();
+                        if (size == 0) notEmpty.await();
+                        // Confirmed we can remove the element, change the size while we still have the lock
+                        size -= 1;
+                        notFull.signal();
+                        sizeLock.unlock();
 
+                        dummyHead.lock.lock();
                         Node toRemove = dummyHead.next;
                         toRemove.lock.lock();
 
@@ -152,16 +139,9 @@ public class PriorityQueue {
 
                         dummyHead.next = afterRemove;
 
-                        writeSizeLock.lock();
-                        size -= 1;
-                        notFull.signal();
-                        writeSizeLock.unlock();
-
                         dummyHead.lock.unlock();
                         
                         return toRemove.name;
-
-
                 } catch (Exception e) {
                         System.out.println(e);
                         e.printStackTrace();
@@ -174,8 +154,9 @@ public class PriorityQueue {
 	}
 
         void print() {
+	            System.out.println("Printing PriorityQueue");
                 Node curr = dummyHead.next;
-                while(curr != null) {
+                while(curr.priority != -1) {
                         System.out.println(curr.name + ", " + curr.priority);
                         curr = curr.next;
                 }
@@ -197,5 +178,5 @@ public class PriorityQueue {
 
 
         }
-}
+        }
 
