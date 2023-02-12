@@ -13,9 +13,9 @@ public class PriorityQueueTest implements Runnable{
 
     public void run() {
         System.out.println(String.format("Added [%s, %d] at: %d", name, priority, priorityQueue.add(name, priority)));
-//        if(priority % 3==0) {
-//            System.out.println("removed first: " + priorityQueue.getFirst());
-//        }
+        if(priority % 3==0) {
+            System.out.println("removed first: " + priorityQueue.getFirst());
+        }
         // System.out.println(String.format("Added [%s, %d] at: %d", "temp", 2, priorityQueue.add("temp", 2)));
         // priorityQueue.print();
 

@@ -61,12 +61,12 @@ public class PriorityQueue {
                                 prev = curr;
                                 curr = curr.next;
                                 idx += 1;
-
                         }
 
+                        // Change pointers
                         prev.next = toInsert;
                         toInsert.next = curr;
-                        // We are the
+                        // Make sure we let go of the locks we need to once the insert happens
                         prev.lock.unlock();
 
                         return idx;
@@ -76,6 +76,8 @@ public class PriorityQueue {
                 } finally {
                         if(dummyHead.lock.isHeldByCurrentThread())
                                 dummyHead.lock.unlock();
+                        if (dummyTail.lock.isHeldByCurrentThread())
+                                dummyTail.lock.unlock();
                 }
                 return -1;
               
@@ -150,7 +152,6 @@ public class PriorityQueue {
                                 dummyHead.lock.unlock();
                 }
                 return "";
-                
 	}
 
         void print() {
@@ -178,5 +179,5 @@ public class PriorityQueue {
 
 
         }
-        }
+}
 
