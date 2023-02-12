@@ -53,7 +53,7 @@ public class PriorityQueue {
 
                         Node curr = dummyHead.next;
 
-                        while(curr.priority != -1 && curr.priority > priority) {
+                        while(curr != null && curr.priority != -1 && curr.priority > priority) {
                                 curr.lock.lock();
                                 // Let go of previous node lock before acquiring next lock
                                 prev.lock.unlock();
@@ -94,7 +94,7 @@ public class PriorityQueue {
                 // Current starts at the actual first item in the queue
                 Node current = dummyHead.next;
 
-                while(current.priority != -1) {
+                while(current != null && current.priority != -1) {
                         // Current and prev should be locked
                         current.lock.lock();
                         if (current.name.equals(name)) {
@@ -157,7 +157,7 @@ public class PriorityQueue {
         void print() {
 	            System.out.println("Printing PriorityQueue");
                 Node curr = dummyHead.next;
-                while(curr.priority != -1) {
+                while(curr != null && curr.priority != -1) {
                         System.out.println(curr.name + ", " + curr.priority);
                         curr = curr.next;
                 }
