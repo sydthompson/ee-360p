@@ -41,8 +41,8 @@ public class PriorityQueue {
                         if(search(name) != -1) {
                                 return -1;
                         }
+                        System.out.println("done with search");
 
-                        readSizeLock.lock();
 
                         if(size == maxSize) {
                                 notFull.await();
@@ -54,10 +54,14 @@ public class PriorityQueue {
 
 
                         Node prev = dummyHead;
+                        prev.lock.lock();
+
                         Node curr = dummyHead.next;
 
                         while(curr != null && curr.priority > priority) {
+                                curr.lock.lock();
                                 prev.lock.unlock();
+
                                 prev = curr;
                                 curr = curr.next;
                                 idx += 1;
@@ -68,7 +72,7 @@ public class PriorityQueue {
                         toInsert.next = curr;
                         
 
-                        if(curr != null) {
+                        if(curr != null && curr.lock.isHeldByCurrentThread()) {
                                 curr.lock.unlock();
                         }
 
@@ -84,8 +88,8 @@ public class PriorityQueue {
                         e.printStackTrace();
 
                 } finally {
-                        readSizeLock.unlock();
-                        dummyHead.lock.unlock();
+                        if(dummyHead.lock.isHeldByCurrentThread())
+                                dummyHead.lock.unlock();
 
                 }
                 return -1;
@@ -145,7 +149,6 @@ public class PriorityQueue {
 
                         Node afterRemove = toRemove.next;
 
-                        afterRemove.lock.lock();
 
                         dummyHead.next = afterRemove;
 
@@ -155,17 +158,16 @@ public class PriorityQueue {
                         writeSizeLock.unlock();
 
                         dummyHead.lock.unlock();
-                        afterRemove.lock.lock();
                         
                         return toRemove.name;
 
 
                 } catch (Exception e) {
                         System.out.println(e);
+                        e.printStackTrace();
                 } finally {
                         if(dummyHead.lock.isHeldByCurrentThread())
                                 dummyHead.lock.unlock();
-                        readSizeLock.unlock();
                 }
                 return "";
                 
