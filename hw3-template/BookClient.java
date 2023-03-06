@@ -22,13 +22,10 @@ public class BookClient {
         this.hostAddress = "localhost";
         this.tcpPort = 7000;
         this.udpPort = 8000;
-        this.isUdp = true; 
+        this.isUdp = true;
 
+        //Initialize socket for UDP
         this.datagramSocket = new DatagramSocket();
-
-        tcpPa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
-        tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
-        tcpOis = new ObjectInputStream(tcpPa.getInputStream());
     }
 
     public String sendTcp(Request r) throws IOException {
@@ -47,16 +44,15 @@ public class BookClient {
         } return "";
     }
 
-    public String sendUdp(Request r ) throws IOException {
+    public String sendUdp(Request r) throws IOException {
        try {
-
            byte[] buffer = getByteArray(r);
 
            DatagramPacket packet = new DatagramPacket(buffer,
                    buffer.length,
                    InetAddress.getByName(hostAddress),
                    udpPort);
-
+           System.out.println("Sending packet...");
            datagramSocket.send(packet);
 
            byte[] rbuffer = new byte[2048];
@@ -106,6 +102,9 @@ public class BookClient {
                 //
                 if (tokens[0].equals("set-mode")) {                             // 0
                     r = new Request(0);
+                    //        tcpPa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
+                    //        tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
+                    //        tcpOis = new ObjectInputStream(tcpPa.getInputStream());
                 } else if (tokens[0].equals("begin-loan")) {                    // 1
                     // Use regex pattern to avoid having to deal with quoted titles
                     Pattern p = Pattern.compile("begin-loan (.*) (\".*\")");
@@ -131,10 +130,13 @@ public class BookClient {
                     System.out.println("ERROR: No such command");
                     continue;
                 }
+                System.out.println("Request processed");
                 //
                 if (client.isUdp) {
+                    System.out.println("Sent UDP packet");
                     client.sendUdp(r);
                 } else {
+                    System.out.println("Sent TCP packet");
                     client.sendTcp(r);
                 }
 

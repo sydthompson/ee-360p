@@ -1,7 +1,4 @@
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
+import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Socket;
@@ -9,30 +6,24 @@ import java.net.SocketException;
 
 public class UdpClientHandler implements Runnable{
 
-    DatagramSocket socket;
     BookServer bookServer;
-    DatagramSocket dataSocket;
 
-    public UdpClientHandler(DatagramSocket socket, BookServer bookServer) {
-        this.socket = socket;
+    DatagramSocket socket;
+    DatagramPacket packet;
+
+    public UdpClientHandler(DatagramSocket socket, BookServer bookServer, DatagramPacket packet) throws IOException{
+        this.socket = new DatagramSocket();
+        System.out.println(bookServer.udpPort);
+        this.packet = packet;
         this.bookServer = bookServer;
-        try {
-            this.dataSocket = new DatagramSocket(socket.getPort());
-        } catch (SocketException e) {
-            System.err.println(e);
-        }
     }
 
     public void run() {
-        
-        //TODO: Accept packets forever here
-        int len = 1024;
         try {
-            byte[] buf = new byte[len];
-            while(true) {
-                String mssg = receive(buf);
-                send(mssg);
-            }
+            Request r = receive(packet);
+            String response = processCommand(r);
+            System.out.println(response);
+            send(response);
         } catch (Exception e) {
             System.err.println(e);
         }
@@ -40,26 +31,29 @@ public class UdpClientHandler implements Runnable{
 
     public void send(String message) throws IOException{
         //Called within run
-        byte[] buffer = new byte[message.length()];
-        buffer = message.getBytes();
-
+        byte[] buffer = getByteArray(message);
         DatagramPacket response = new DatagramPacket(buffer, 
                                                      buffer.length, 
-                                                     socket.getInetAddress(), 
-                                                     socket.getPort());
-        dataSocket.send(response);
+                                                     socket.getInetAddress(),
+                                                     bookServer.udpPort);
+        System.out.println("Sending");
+        socket.send(response);
     }
 
-    public String receive(byte[] buf) throws IOException, ClassNotFoundException{
-        //Called within run
-        DatagramPacket packet = new DatagramPacket(buf, buf.length);
-        dataSocket.receive(packet);
-        ByteArrayInputStream bis = new ByteArrayInputStream(packet.getData());
-        ObjectInput in = new ObjectInputStream(bis);
+    private byte[] getByteArray(String message) throws IOException{
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        ObjectOutputStream write = new ObjectOutputStream(stream);
+        write.writeObject(message);
+        write.flush();
+        return stream.toByteArray();
+    }
 
+    public Request receive(DatagramPacket packet) throws IOException, ClassNotFoundException{
+        ByteArrayInputStream bais = new ByteArrayInputStream(packet.getData());
+        ObjectInputStream in = new ObjectInputStream(bais);
         Request r = (Request) (in.readObject());
 
-        return processCommand(r);
+        return r;
     }
 
     public String processCommand(Request r) {
