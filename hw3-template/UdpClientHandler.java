@@ -67,15 +67,38 @@ public class UdpClientHandler implements Runnable{
         switch (r.operationId) {
             case 0:
                 int x = 1;
+                if(r.setUdp) {
+                    response = "The communication mode is set to UDP";
+                } else {
+                    response = "The communication mode is set to TCP";
+                }
                 break;
             case 1:
-                bookServer.inventory.put(r.title, bookServer.inventory.get(r.title) - 1);
-                int y = bookServer.loanNumber.intValue() + 1;
-                // Return message
-                break;
+                int numBooks = bookServer.inventory.get(r.title);
+                if(!bookServer.inventory.contains(r.title) || numBooks <= 0) {
+                    response = "Request failed - We do not have this book";
+                }
+                else {
+                    bookServer.inventory.put(r.title, numBooks - 1);
+                    int y = bookServer.loanNumber.incrementAndGet();
+                    bookServer.loanMap.put(y, r.title);
+                    response = String.format("Your request has been approved, %d, %s %s", 
+                                                    y, r.user, r.title);
+                } break;
             case 2:
                 int a = 2;
-                break;
+                if(!bookServer.loanMap.contains(Integer.parseInt(r.loanId))) {
+                    response = String.format("%s not found, no such borrow record", r.loanId);
+                }
+                else {
+                    String bookTitle = bookServer.loanMap.get(Integer.parseInt(r.loanId));
+                    int y = bookServer.inventory.get(bookTitle);
+
+                    bookServer.inventory.put(bookTitle, y + 1);
+                    bookServer.loanMap.remove(Integer.parseInt(r.loanId));
+
+                    response = String.format("%s is returned", r.loanId);
+                } break;
             case 3:
                 int b = 3;
                 break;

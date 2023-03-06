@@ -5,6 +5,7 @@ public class Request implements Serializable {
     // Information will be taken based on `operationId` field
     int operationId;
     // Optional fields
+    boolean setUdp = false;
     String user;
     String title;
     String loanId;

@@ -106,6 +106,7 @@ public class BookClient {
                 //
                 if (tokens[0].equals("set-mode")) {                             // 0
                     r = new Request(0);
+                    if(tokens[1].equals("u")) { r.setUdp = true; }
                 } else if (tokens[0].equals("begin-loan")) {                    // 1
                     // Use regex pattern to avoid having to deal with quoted titles
                     Pattern p = Pattern.compile("begin-loan (.*) (\".*\")");
