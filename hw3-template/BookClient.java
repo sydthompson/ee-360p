@@ -1,6 +1,7 @@
-import java.util.Scanner;
 import java.io.*;
+import java.net.*;
 import java.util.*;
+import java.util.regex.*;
 
 public class BookClient {
     public static void main(String[] args) {
@@ -32,8 +33,14 @@ public class BookClient {
                 if (tokens[0].equals("set-mode")) {
                     // TODO: set the mode of communication for sending commands to the server
                 } else if (tokens[0].equals("begin-loan")) {
-                    // TODO: send appropriate command to the server and display the
-                    // appropriate responses form the server
+                    // Use regex pattern to avoid
+                    Pattern p = Pattern.compile("begin-loan (.*) (\".*\")");
+                    Matcher m = p.matcher(cmd);
+                    m.matches();
+
+                    String user = m.group(1);
+                    String title = m.group(2);
+                    System.out.println(user + " wants " + title);
                 } else if (tokens[0].equals("end-loan")) {
                     // TODO: send appropriate command to the server and display the
                     // appropriate responses form the server
@@ -41,8 +48,7 @@ public class BookClient {
                     // TODO: send appropriate command to the server and display the
                     // appropriate responses form the server
                 } else if (tokens[0].equals("get-inventory")) {
-                    // TODO: send appropriate command to the server and display the
-                    // appropriate responses form the server
+
                 } else if (tokens[0].equals("exit")) {
                     // TODO: send appropriate command to the server
                 } else {

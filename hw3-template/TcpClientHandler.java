@@ -1,9 +1,20 @@
+import java.io.*;
+import java.net.*;
+
 public class TcpClientHandler implements Runnable {
 
-    public TcpClientHandler() {}
+    Socket socket;
+    PrintWriter out;
+    BufferedReader in;
+
+    public TcpClientHandler(Socket socket) throws IOException {
+        this.socket = socket;
+        out = new PrintWriter(socket.getOutputStream(), true);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    }
 
     public void run() {
-        //TODO: Accept packets forever here
+        //TODO: Read/write packets here
     }
 
     public void send() {
