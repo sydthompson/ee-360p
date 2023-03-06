@@ -48,7 +48,7 @@ public class BookServer {
                 ServerSocket listener = new ServerSocket(clientSocket.getPort());
                 Socket s;
                 while ( (s = listener.accept()) != null) {
-                    (new TcpClientHandler(s)).run();
+                    (new TcpClientHandler(s, server)).run();
                 }
 
 

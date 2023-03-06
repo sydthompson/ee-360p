@@ -5,10 +5,12 @@ import java.util.Scanner;
 public class TcpClientHandler implements Runnable {
 
     Socket socket;
+    BookServer bookServer;
 
 
-    public TcpClientHandler(Socket socket)  {
+    public TcpClientHandler(Socket socket, BookServer bookdServer)  {
         this.socket = socket;
+        this.bookServer = bookdServer;
     }
 
     public void run() {
@@ -37,8 +39,8 @@ public class TcpClientHandler implements Runnable {
         Scanner sc = new Scanner(in);
         String command = sc.nextLine();
         // to-do: go through possible commands and perform correct actions
-
+        String response = bookServer.processCommand(command);
         sc.close();
-        return " ";
+        return response;
     }
 }
