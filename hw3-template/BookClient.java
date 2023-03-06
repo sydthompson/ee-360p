@@ -5,10 +5,12 @@ import java.util.regex.*;
 
 public class BookClient {
     public static void main(String[] args) {
+
         String hostAddress;
         int tcpPort;
         int udpPort;
         int clientId;
+        boolean isUpd = true;
 
         if (args.length != 2) {
             System.out.println("ERROR: Provide 2 arguments: command-file, clientId");
