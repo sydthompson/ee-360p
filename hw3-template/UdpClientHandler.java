@@ -53,6 +53,5 @@ public class UdpClientHandler implements Runnable{
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         dataSocket.receive(packet);
         String command = new String(packet.getData(), 0, packet.getLength());
-        return bookServer.processCommand(command);
     }
 }

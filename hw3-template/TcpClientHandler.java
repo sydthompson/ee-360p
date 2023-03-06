@@ -8,9 +8,9 @@ public class TcpClientHandler implements Runnable {
     BookServer bookServer;
 
 
-    public TcpClientHandler(Socket socket, BookServer bookdServer)  {
+    public TcpClientHandler(Socket socket, BookServer bookServer)  {
         this.socket = socket;
-        this.bookServer = bookdServer;
+        this.bookServer = bookServer;
     }
 
     public void run() {
@@ -42,5 +42,26 @@ public class TcpClientHandler implements Runnable {
         String response = bookServer.processCommand(command);
         sc.close();
         return response;
+    }
+
+    public void processCommand(Request r) {
+        switch (r.operationId) {
+            case(0):
+                int x = 1;
+                break;
+            case(1):
+                bookServer.inventory.put(r.title, bookServer.inventory.get(r.title) - 1);
+                int y = bookServer.loanNumber++;
+                // Return message
+                break;
+            case(2):
+                break;
+            case(3):
+                break;
+            case(4):
+                break;
+            case(5):
+                break;
+        }
     }
 }

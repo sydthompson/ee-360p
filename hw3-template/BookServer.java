@@ -3,6 +3,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.*;
 
 public class BookServer {
@@ -12,6 +13,7 @@ public class BookServer {
     ServerSocket tcpSocket;
 
     ConcurrentHashMap<String, Integer> inventory;
+    AtomicInteger loanNumber = new AtomicInteger(0);
 
     public BookServer () throws IOException {
         udpSocket = new DatagramSocket(udpPort);
@@ -36,15 +38,14 @@ public class BookServer {
         while (true) {
             //Create socket and spawn threads based on UDP or TCP as needed from here
             try{
-                //TODO: How to listen to both UDP and TCP? TCP we can make a thread for every connection
-                //TODO: established. But UDP seems trickier...
+                //TODO: Put UDP and TCP listeners on separate threads
 //                byte[] udpBuffer = new byte[2048];
 //                DatagramPacket packet = new DatagramPacket(udpBuffer, udpBuffer.length);
 //                server.udpSocket.receive(packet);
-
-                /* UDP Listener */
-                UdpClientHandler udpClient = new UdpClientHandler(server.udpSocket, server);  
-                udpClient.run();
+//
+//                /* UDP Listener */
+//                UdpClientHandler udpClient = new UdpClientHandler(server.udpSocket, server);
+//                udpClient.run();
 
                 /* TCP Listener */
                 Socket clientSocket = server.tcpSocket.accept();
@@ -88,19 +89,6 @@ public class BookServer {
         inventory.entrySet().forEach(entry -> {
             System.out.println(entry.getKey() + ", " + entry.getValue());
         });
-    }
-
-    public String processCommand(String mssg) {
-        String response = "";
-        String[] split = mssg.split( "\\s+");
-        switch(split[0]) {
-           case "begin-loan": response = beginLoan(split[1], split[2]);
-           case "end-loan": response = endLoan(split[1]);
-           case "get-loans": response = getLoans(split[1]);
-           case "get-inventory": response = getInventory();
-           case "exit": response = exit();
-        }
-        return response;
     }
 
     public String beginLoan(String userName, String bookName) {
