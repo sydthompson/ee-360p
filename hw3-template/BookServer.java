@@ -13,7 +13,7 @@ public class BookServer {
     ServerSocket tcpSocket;
 
     ConcurrentHashMap<String, Integer> inventory;
-    ConcurrentHashMap<Integer, String> loanMap;
+    ConcurrentHashMap<Integer, LoanInfo> loanMap;
     AtomicInteger loanNumber = new AtomicInteger(0);
 
     public BookServer () throws IOException {
@@ -89,4 +89,5 @@ public class BookServer {
         }
         return output;
     }
+
 }

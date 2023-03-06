@@ -1,4 +1,5 @@
 import java.io.ByteArrayInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectInputStream;
@@ -6,6 +7,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.HashMap;
+
 
 public class UdpClientHandler implements Runnable{
 
@@ -62,7 +65,7 @@ public class UdpClientHandler implements Runnable{
         return processCommand(r);
     }
 
-    public String processCommand(Request r) {
+    public String processCommand(Request r) throws IOException {
         String response = "ERROR";
         switch (r.operationId) {
             case 0:
@@ -81,7 +84,10 @@ public class UdpClientHandler implements Runnable{
                 else {
                     bookServer.inventory.put(r.title, numBooks - 1);
                     int y = bookServer.loanNumber.incrementAndGet();
-                    bookServer.loanMap.put(y, r.title);
+                   
+                    LoanInfo myInfo = new LoanInfo(r.title, r.user);
+
+                    bookServer.loanMap.put(y, myInfo);
                     response = String.format("Your request has been approved, %d, %s %s", 
                                                     y, r.user, r.title);
                 } break;
@@ -91,7 +97,7 @@ public class UdpClientHandler implements Runnable{
                     response = String.format("%s not found, no such borrow record", r.loanId);
                 }
                 else {
-                    String bookTitle = bookServer.loanMap.get(Integer.parseInt(r.loanId));
+                    String bookTitle = bookServer.loanMap.get(Integer.parseInt(r.loanId)).title;
                     int y = bookServer.inventory.get(bookTitle);
 
                     bookServer.inventory.put(bookTitle, y + 1);
@@ -101,14 +107,28 @@ public class UdpClientHandler implements Runnable{
                 } break;
             case 3:
                 int b = 3;
+                response = "";
+                for(int loanId: bookServer.loanMap.keySet()) {
+                    LoanInfo info = bookServer.loanMap.get(loanId);
+                    if (info.username.equals(r.user)) {
+                        response += String.format("%d %s\n", loanId, info.title);
+                    }
+                }
+                if(response.length() == 0) { response = String.format("No record found for %s.", r.user); }
                 break;
             case 4:
                 response = bookServer.checkInventory();
                 break;
             case 5:
                 int c = 4;
+                //to-do: inform server to stop processing commands from this client
+                FileWriter fileWriter = new FileWriter("inventory.txt", false);
+                fileWriter.write(bookServer.checkInventory());
+                fileWriter.close();
+                response = "Closing connection with client";
                 break;
         }
         return response;
     }
+
 }
