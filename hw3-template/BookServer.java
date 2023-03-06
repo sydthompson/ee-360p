@@ -2,6 +2,7 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.*;
 
 public class BookServer {
@@ -10,12 +11,12 @@ public class BookServer {
     DatagramSocket udpSocket;
     ServerSocket tcpSocket;
 
-    LinkedHashMap<String, Integer> inventory;
+    ConcurrentHashMap<String, Integer> inventory;
 
     public BookServer () throws IOException {
         udpSocket = new DatagramSocket(udpPort);
         tcpSocket = new ServerSocket(tcpPort);
-        //TODO: synchronized code doesn't have to be good, just lock HashMap whenever we do something
+        inventory = new ConcurrentHashMap<>();
     }
 
     public static void main(String[] args) throws IOException {
@@ -41,8 +42,15 @@ public class BookServer {
 //                DatagramPacket packet = new DatagramPacket(udpBuffer, udpBuffer.length);
 //                server.udpSocket.receive(packet);
 
+                /* TCP Listener */
                 Socket clientSocket = server.tcpSocket.accept();
-                new Thread(new TcpClientHandler(clientSocket)).start();
+
+                ServerSocket listener = new ServerSocket(clientSocket.getPort());
+                Socket s;
+                while ( (s = listener.accept()) != null) {
+                    (new TcpClientHandler(s)).run();
+                }
+
 
             } catch (SocketException e) {
                 e.printStackTrace();
@@ -51,14 +59,19 @@ public class BookServer {
     }
 
     //TODO: Maybe change below functions into part of Server class
-    static LinkedHashMap<String, Integer> parseFile(File file) throws FileNotFoundException {
-        LinkedHashMap<String, Integer> inventory = new LinkedHashMap<>();
+    static ConcurrentHashMap<String, Integer> parseFile(File file) throws FileNotFoundException {
+
+        ConcurrentHashMap<String, Integer> inventory = new ConcurrentHashMap<>();
+
         Scanner sc = new Scanner(file);
         Pattern p = Pattern.compile("(\".*\") (\\d+)");
+
         while (sc.hasNextLine()) {
+
             String entry = sc.nextLine();
             Matcher m = p.matcher(entry);
             m.matches();
+
             // Get group matches and populate inventory structure
             String title = m.group(1);
             Integer quantity = Integer.valueOf(m.group(2));
@@ -68,9 +81,42 @@ public class BookServer {
         return inventory;
     }
 
-    static void checkInventory(HashMap<String, Integer> inventory) {
+    static void checkInventory(ConcurrentHashMap<String, Integer> inventory) {
         inventory.entrySet().forEach(entry -> {
             System.out.println(entry.getKey() + ", " + entry.getValue());
         });
+    }
+
+    public String processCommand(String mssg) {
+        String response = "";
+        String[] split = mssg.split( "\\s+");
+        switch(split[0]) {
+           case "begin-loan": response = beginLoan(split[1], split[2]);
+           case "end-loan": response = endLoan(split[1]);
+           case "get-loans": response = getLoans(split[1]);
+           case "get-inventory": response = getInventory();
+           case "exit": response = exit();
+        }
+        return response;
+    }
+
+    public String beginLoan(String userName, String bookName) {
+        return "";
+    }
+
+    public String endLoan(String loanId) {
+        return "";
+    }
+
+    public String getLoans(String userName) {
+        return "";
+    }
+
+    public String getInventory() {
+        return "";
+    }
+
+    public String exit() {
+        return "";
     }
 }
