@@ -42,6 +42,10 @@ public class BookServer {
 //                DatagramPacket packet = new DatagramPacket(udpBuffer, udpBuffer.length);
 //                server.udpSocket.receive(packet);
 
+                /* UDP Listener */
+                UdpClientHandler udpClient = new UdpClientHandler(server.udpSocket, server);  
+                udpClient.run();
+
                 /* TCP Listener */
                 Socket clientSocket = server.tcpSocket.accept();
 
@@ -58,7 +62,6 @@ public class BookServer {
         }
     }
 
-    //TODO: Maybe change below functions into part of Server class
     static ConcurrentHashMap<String, Integer> parseFile(File file) throws FileNotFoundException {
 
         ConcurrentHashMap<String, Integer> inventory = new ConcurrentHashMap<>();

@@ -61,4 +61,52 @@ public class BookClient {
             e.printStackTrace();
         }
     }
+
+    public static String sendUpd(String mssg, int clientId, int updPort, String hostAddress) {
+        DatagramSocket dataSocket = null;
+        try {
+            dataSocket = new DatagramSocket();
+            byte[] buffer = new byte[mssg.length()];
+            buffer = mssg.getBytes();
+
+            DatagramPacket packet = new DatagramPacket(buffer, 
+                                                       buffer.length, 
+                                                       InetAddress.getByName(hostAddress), 
+                                                       updPort);
+
+            dataSocket.send(packet);
+
+            byte[] rbuffer = new byte[2048];
+            DatagramPacket rPacket = new DatagramPacket(rbuffer, rbuffer.length);
+            dataSocket.receive(rPacket);
+            dataSocket.close();
+
+            return new String(rPacket.getData(), 0, rPacket.getLength());
+
+        } catch(Exception e) {
+            System.err.println(e);
+        } return "";
+    }
+
+    public static String sendTcp(String mssg, int clientId, int tcpPort, String hostAddress) {
+        try {
+            Socket pa = new Socket(InetAddress.getByName(hostAddress), tcpPort);
+            PrintWriter pout = new PrintWriter(pa.getOutputStream());
+            pout.println(mssg);
+            pout.flush();
+
+            Scanner sc = new Scanner(pa.getInputStream());
+            String response = "";
+            while(sc.hasNextLine() && !sc.nextLine().equals("end")) {
+                response += sc.nextLine();
+            }
+
+            sc.close();
+            pa.close();
+            return response;
+
+        } catch(Exception e) {
+            System.err.println(e);
+        } return "";
+    }
 }
