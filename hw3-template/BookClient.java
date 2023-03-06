@@ -12,30 +12,34 @@ public class BookClient {
 
     int clientId;
 
-    Socket pa;
-    ObjectOutputStream oos;
-    ObjectInputStream ois;
+    Socket tcpPa;
+    ObjectOutputStream tcpOos;
+    ObjectInputStream tcpOis;
+
+    DatagramSocket datagramSocket;
 
     public BookClient() throws IOException {
         this.hostAddress = "localhost";
         this.tcpPort = 7000;
         this.udpPort = 8000;
-        this.isUdp = false; //TODO: Should be true
+        this.isUdp = true; 
 
-        pa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
-        oos = new ObjectOutputStream(pa.getOutputStream());
-        ois = new ObjectInputStream(pa.getInputStream());
+        this.datagramSocket = new DatagramSocket();
+
+        tcpPa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
+        tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
+        tcpOis = new ObjectInputStream(tcpPa.getInputStream());
     }
 
     public String sendTcp(Request r) throws IOException {
         try {
             // Write serializable object to the output stream and flush to send if connection established
-            oos.writeObject(r);
-            oos.flush();
+            tcpOos.writeObject(r);
+            tcpOos.flush();
 
             System.out.println("Getting response");
             // Expect the server to return only string responses
-            String response = (String) ois.readObject();
+            String response = (String) tcpOis.readObject();
             System.out.println(response);
             return response;
         } catch(Exception e) {
@@ -44,30 +48,35 @@ public class BookClient {
     }
 
     public String sendUdp(Request r ) throws IOException {
-//        DatagramSocket dataSocket = null;
-//        try {
-//            dataSocket = new DatagramSocket();
-//            byte[] buffer = new byte[mssg.length()];
-//            buffer = mssg.getBytes();
-//
-//            DatagramPacket packet = new DatagramPacket(buffer,
-//                    buffer.length,
-//                    InetAddress.getByName(hostAddress),
-//                    udpPort);
-//
-//            dataSocket.send(packet);
-//
-//            byte[] rbuffer = new byte[2048];
-//            DatagramPacket rPacket = new DatagramPacket(rbuffer, rbuffer.length);
-//            dataSocket.receive(rPacket);
-//            dataSocket.close();
-//
-//            return new String(rPacket.getData(), 0, rPacket.getLength());
-//
-//        } catch (Exception e) {
-//            System.err.println(e);
-//        }
+       try {
+
+           byte[] buffer = getByteArray(r);
+
+           DatagramPacket packet = new DatagramPacket(buffer,
+                   buffer.length,
+                   InetAddress.getByName(hostAddress),
+                   udpPort);
+
+           datagramSocket.send(packet);
+
+           byte[] rbuffer = new byte[2048];
+           DatagramPacket rPacket = new DatagramPacket(rbuffer, rbuffer.length);
+           datagramSocket.receive(rPacket);
+
+           return new String(rPacket.getData(), 0, rPacket.getLength());
+
+       } catch (Exception e) {
+           System.err.println(e);
+       }
         return "";
+    }
+
+    private byte[] getByteArray(Request r) throws IOException{
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        ObjectOutputStream write = new ObjectOutputStream(stream);
+        write.writeObject(r);
+        write.flush();
+        return stream.toByteArray();
     }
 
     public static void main(String[] args) throws IOException{
@@ -124,6 +133,7 @@ public class BookClient {
                 }
                 //
                 if (client.isUdp) {
+                    client.sendUdp(r);
                 } else {
                     client.sendTcp(r);
                 }
