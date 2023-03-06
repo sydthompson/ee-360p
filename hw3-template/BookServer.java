@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.*;
 
 public class BookServer {
-
+    //TODO: UDP queue, HashMap
     int tcpPort = 7000, udpPort= 8000;
     DatagramSocket udpSocket;
     ServerSocket tcpSocket;
@@ -32,8 +32,6 @@ public class BookServer {
         File init = new File(fileName);
         server.inventory = parseFile(init);
 
-        checkInventory(server.inventory);
-
         // TODO: handle request from clients
         while (true) {
             //Create socket and spawn threads based on UDP or TCP as needed from here
@@ -47,16 +45,11 @@ public class BookServer {
 //                UdpClientHandler udpClient = new UdpClientHandler(server.udpSocket, server);
 //                udpClient.run();
 
-                /* TCP Listener */
-                Socket clientSocket = server.tcpSocket.accept();
-
-                ServerSocket listener = new ServerSocket(clientSocket.getPort());
-                Socket s;
-                while ( (s = listener.accept()) != null) {
-                    (new TcpClientHandler(s, server)).run();
-                }
-
-
+                // Blocks until connection established
+                Socket s = server.tcpSocket.accept();
+                System.out.println("Connection accepted, handing off");
+                // Hand off the socket to a thread to manage the connection
+                new Thread(new TcpClientHandler(s, server)).start();
             } catch (SocketException e) {
                 e.printStackTrace();
             }
@@ -85,29 +78,13 @@ public class BookServer {
         return inventory;
     }
 
-    static void checkInventory(ConcurrentHashMap<String, Integer> inventory) {
-        inventory.entrySet().forEach(entry -> {
-            System.out.println(entry.getKey() + ", " + entry.getValue());
-        });
-    }
-
-    public String beginLoan(String userName, String bookName) {
-        return "";
-    }
-
-    public String endLoan(String loanId) {
-        return "";
-    }
-
-    public String getLoans(String userName) {
-        return "";
-    }
-
-    public String getInventory() {
-        return "";
-    }
-
-    public String exit() {
-        return "";
+    String checkInventory() {
+        String output = "";
+        for (Map.Entry<String, Integer> entry : inventory.entrySet()) {
+            String key = entry.getKey();
+            Integer value = entry.getValue();
+            output += String.format("%s %s\n", key, value);
+        }
+        return output;
     }
 }

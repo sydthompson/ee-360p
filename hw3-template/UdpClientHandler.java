@@ -17,8 +17,7 @@ public class UdpClientHandler implements Runnable{
             this.dataSocket = new DatagramSocket(socket.getPort());
         } catch (SocketException e) {
             System.err.println(e);
-        } 
-
+        }
     }
 
     public void run() {
@@ -53,5 +52,6 @@ public class UdpClientHandler implements Runnable{
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         dataSocket.receive(packet);
         String command = new String(packet.getData(), 0, packet.getLength());
+        return "";
     }
 }

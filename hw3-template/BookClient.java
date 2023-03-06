@@ -1,4 +1,3 @@
-import java.awt.print.Book;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -13,52 +12,61 @@ public class BookClient {
 
     int clientId;
 
+    Socket pa;
+    ObjectOutputStream oos;
+    ObjectInputStream ois;
+
     public BookClient() throws IOException {
         this.hostAddress = "localhost";
         this.tcpPort = 7000;
         this.udpPort = 8000;
         this.isUdp = false; //TODO: Should be true
+
+        pa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
+        oos = new ObjectOutputStream(pa.getOutputStream());
+        ois = new ObjectInputStream(pa.getInputStream());
     }
 
     public String sendTcp(Request r) throws IOException {
         try {
-            //TODO: Socket and oos should not be established here ephemerally, but sustained until set-mode is called
-            Socket pa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
-            ObjectOutputStream oos = new ObjectOutputStream(pa.getOutputStream());
             // Write serializable object to the output stream and flush to send if connection established
             oos.writeObject(r);
             oos.flush();
 
-            //TODO: Block for a response here
+            System.out.println("Getting response");
+            // Expect the server to return only string responses
+            String response = (String) ois.readObject();
+            System.out.println(response);
+            return response;
         } catch(Exception e) {
             System.err.println(e);
         } return "";
     }
 
-    public String sendUdp(String mssg) {
-        DatagramSocket dataSocket = null;
-        try {
-            dataSocket = new DatagramSocket();
-            byte[] buffer = new byte[mssg.length()];
-            buffer = mssg.getBytes();
-
-            DatagramPacket packet = new DatagramPacket(buffer,
-                    buffer.length,
-                    InetAddress.getByName(hostAddress),
-                    udpPort);
-
-            dataSocket.send(packet);
-
-            byte[] rbuffer = new byte[2048];
-            DatagramPacket rPacket = new DatagramPacket(rbuffer, rbuffer.length);
-            dataSocket.receive(rPacket);
-            dataSocket.close();
-
-            return new String(rPacket.getData(), 0, rPacket.getLength());
-
-        } catch (Exception e) {
-            System.err.println(e);
-        }
+    public String sendUdp(Request r ) throws IOException {
+//        DatagramSocket dataSocket = null;
+//        try {
+//            dataSocket = new DatagramSocket();
+//            byte[] buffer = new byte[mssg.length()];
+//            buffer = mssg.getBytes();
+//
+//            DatagramPacket packet = new DatagramPacket(buffer,
+//                    buffer.length,
+//                    InetAddress.getByName(hostAddress),
+//                    udpPort);
+//
+//            dataSocket.send(packet);
+//
+//            byte[] rbuffer = new byte[2048];
+//            DatagramPacket rPacket = new DatagramPacket(rbuffer, rbuffer.length);
+//            dataSocket.receive(rPacket);
+//            dataSocket.close();
+//
+//            return new String(rPacket.getData(), 0, rPacket.getLength());
+//
+//        } catch (Exception e) {
+//            System.err.println(e);
+//        }
         return "";
     }
 
