@@ -20,7 +20,7 @@ class UdpThread implements Runnable {
                 /* UDP Listener */
                 new Thread(new UdpClientHandler(server.udpSocket, server, packet)).start();
             } catch (Exception e) {
-                System.err.println(e);
+                e.printStackTrace(System.out);
             }
         }
     }

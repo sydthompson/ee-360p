@@ -68,7 +68,7 @@ public class BookServer {
             Integer value = entry.getValue();
             output += String.format("%s %s\n", key, value);
         }
-        return output;
+        return output.trim();
     }
 
 }

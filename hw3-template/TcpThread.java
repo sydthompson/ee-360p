@@ -18,7 +18,7 @@ class TcpThread implements Runnable {
                 // Hand off the socket to a thread to manage the connection
                 new Thread(new TcpClientHandler(s, server)).start();
             } catch (Exception e) {
-                System.err.println(e);
+                e.printStackTrace(System.out);
             }
         }
     }

@@ -24,7 +24,6 @@ public class BookClient {
         this.hostAddress = "localhost";
         this.tcpPort = 7000;
         this.udpPort = 8000;
-        this.isUdp = true;
         this.clientId = clientId;
 
         this.writer = new FileWriter(new File(String.format("out_%d.txt", clientId)));
@@ -84,7 +83,7 @@ public class BookClient {
         return "";
     }
 
-    private byte[] getByteArray(Request r) throws IOException{
+    private byte[] getByteArray(Request r) throws IOException {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         ObjectOutputStream write = new ObjectOutputStream(stream);
         write.writeObject(r);
@@ -98,7 +97,9 @@ public class BookClient {
         return convert;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        Boolean exitStatus = true;
+        BookClient client = new BookClient(Integer.parseInt(args[1]));
 
         try {
 
@@ -110,16 +111,12 @@ public class BookClient {
             }
 
             String commandFile = args[0];
-            BookClient client = new BookClient(Integer.parseInt(args[1]));
-
 
             Scanner sc = new Scanner(new FileReader(commandFile));
-
 
             while (sc.hasNextLine()) {
                 //Each line corresponds to one command, `r` will be piped to relevant transmission method
                 Request r;
-                Boolean exitStatus = false;
 
                 String cmd = sc.nextLine().trim();
                 String[] tokens = cmd.split("\\s+");
@@ -155,7 +152,6 @@ public class BookClient {
                     r = new Request(4);
                 } else if (tokens[0].equals("exit")) {                          // 5
                     r = new Request(5);
-                    client.writer.flush();
                     exitStatus = true;
                 } else {
                     System.out.println("ERROR: No such command");
@@ -167,15 +163,20 @@ public class BookClient {
                 } else {
                     System.out.println(client.sendTcp(r));
                 }
-
-                if (exitStatus) {
-                    System.exit(1);
-                }
             }
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-
+            if (exitStatus) {
+                client.datagramSocket.close();
+                client.tcpOos.flush();
+                client.tcpOis.close();
+                client.tcpOos.close();
+                client.tcpPa.close();
+                client.writer.flush();
+                client.writer.close();
+                System.exit(1);
+            }
         }
     }
 }

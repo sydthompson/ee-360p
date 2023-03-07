@@ -22,7 +22,7 @@ public class UdpClientHandler implements Runnable{
             String response = processCommand(r);
             send(response);
         } catch (Exception e) {
-            System.err.println(e);
+            e.printStackTrace(System.out);
         }
     }
 
@@ -89,19 +89,23 @@ public class UdpClientHandler implements Runnable{
                 } break;
             case 3:
                 response = "";
-                for(int loanId: bookServer.loanMap.keySet()) {
+                for (int loanId: bookServer.loanMap.keySet()) {
                     LoanInfo info = bookServer.loanMap.get(loanId);
                     if (info.username.equals(r.user)) {
                         response += String.format("%d %s\n", loanId, info.title);
                     }
                 }
-                if(response.length() == 0) { response = String.format("No record found for %s.", r.user); }
+                if (response.length() == 0) {
+                    response = String.format("No record found for %s.", r.user);
+                }
+                else {
+                    response = response.trim();
+                }
                 break;
             case 4:
                 response = bookServer.checkInventory();
                 break;
             case 5:
-                //to-do: inform server to stop processing commands from this client
                 FileWriter fileWriter = new FileWriter(new File("inventory.txt"), false);
                 fileWriter.write(bookServer.checkInventory());
                 fileWriter.close();

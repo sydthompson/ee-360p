@@ -10,6 +10,8 @@ public class TcpClientHandler implements Runnable {
     ObjectOutputStream oos;
     ObjectInputStream ois;
 
+    Boolean clientRunning = true;
+
     public TcpClientHandler(Socket socket, BookServer bookServer) throws IOException{
         this.socket = socket;
         this.bookServer = bookServer;
@@ -20,7 +22,7 @@ public class TcpClientHandler implements Runnable {
 
     public void run() {
         try {
-            while(true) {
+            while(clientRunning) {
                 Request r = (Request) ois.readObject();
                 String response = processCommand(r);
 
@@ -28,7 +30,17 @@ public class TcpClientHandler implements Runnable {
                 oos.flush();
             }
         } catch(Exception e) {
-            System.err.println(e);
+            //
+        } finally {
+            try {
+                if (!clientRunning) {
+                    oos.flush();
+                    oos.close();
+                    ois.close();
+                }
+            } catch (IOException io) {
+                //
+            }
         }
     }
 
@@ -86,17 +98,19 @@ public class TcpClientHandler implements Runnable {
                 }
                 if (response.length() == 0) {
                     response = String.format("No record found for %s.", r.user);
+                } else {
+                    response = response.trim();
                 }
                 break;
             case 4:
                 response = bookServer.checkInventory();
                 break;
             case 5:
-                //to-do: inform server to stop processing commands from this client
                 FileWriter fileWriter = new FileWriter(new File("inventory.txt"), false);
                 fileWriter.write(bookServer.checkInventory());
                 fileWriter.close();
                 response = "Closing connection with client";
+                clientRunning = false;
                 break;
         }
         return response;
