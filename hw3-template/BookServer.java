@@ -34,7 +34,6 @@ public class BookServer {
         File init = new File(fileName);
         server.inventory = parseFile(init);
 
-        // TODO: handle request from clients
         while (true) {
             //Create socket and spawn threads based on UDP or TCP as needed from here
             try{

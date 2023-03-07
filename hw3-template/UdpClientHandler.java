@@ -32,7 +32,6 @@ public class UdpClientHandler implements Runnable{
         try {
             Request r = receive(packet);
             String response = processCommand(r);
-            System.out.println(response);
             send(response);
         } catch (Exception e) {
             System.err.println(e);
@@ -41,21 +40,11 @@ public class UdpClientHandler implements Runnable{
 
     public void send(String message) throws IOException{
         //Called within run
-        byte[] buffer = getByteArray(message);
-        DatagramPacket response = new DatagramPacket(buffer, 
-                                                     buffer.length, 
-                                                     socket.getInetAddress(),
-                                                     bookServer.udpPort);
-        System.out.println("Sending");
+        DatagramPacket response = new DatagramPacket(message.getBytes(),
+                                                     message.length(),
+                                                     packet.getAddress(),
+                                                     packet.getPort());
         socket.send(response);
-    }
-
-    private byte[] getByteArray(String message) throws IOException{
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        ObjectOutputStream write = new ObjectOutputStream(stream);
-        write.writeObject(message);
-        write.flush();
-        return stream.toByteArray();
     }
 
     public Request receive(DatagramPacket packet) throws IOException, ClassNotFoundException{

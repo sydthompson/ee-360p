@@ -37,7 +37,6 @@ public class BookClient {
             System.out.println("Getting response");
             // Expect the server to return only string responses
             String response = (String) tcpOis.readObject();
-            System.out.println(response);
             return response;
         } catch(Exception e) {
             System.err.println(e);
@@ -137,11 +136,10 @@ public class BookClient {
                 System.out.println("Request processed");
                 //
                 if (client.isUdp) {
-                    System.out.println("Sent UDP packet");
-                    client.sendUdp(r);
+                    System.out.println(client.sendUdp(r));
                 } else {
                     System.out.println("Sent TCP packet");
-                    client.sendTcp(r);
+                    System.out.println(client.sendTcp(r));
                 }
 
             }
