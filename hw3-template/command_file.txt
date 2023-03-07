@@ -1,0 +1,5 @@
+begin-loan Mike "Divergent"
+begin-loan Lucy "Divergent"
+begin-loan Michael "Divergent"
+get-loans Mike
+get-inventory

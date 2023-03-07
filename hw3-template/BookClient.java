@@ -118,7 +118,7 @@ public class BookClient {
             while (sc.hasNextLine()) {
                 //Each line corresponds to one command, `r` will be piped to relevant transmission method
                 Request r;
-                Boolean exitStatus = false, changeMode = false;
+                Boolean exitStatus = false;
 
                 String cmd = sc.nextLine().trim();
                 String[] tokens = cmd.split("\\s+");
@@ -126,11 +126,12 @@ public class BookClient {
                 //
                 if (tokens[0].equals("set-mode")) {                             // 0
                     r = new Request(0);
-                    changeMode = true;
                     if (tokens[1].equals("u") && client.isUdp == false) {
                         r.setUdp = true;
+                        client.isUdp = true;
                     } else if (tokens[1].equals("t") && client.isUdp == true) {
                         r.setUdp = false;
+                        client.isUdp = false;
                     }
                 } else if (tokens[0].equals("begin-loan")) {                    // 1
                     // Use regex pattern to avoid having to deal with quoted titles
@@ -169,8 +170,6 @@ public class BookClient {
                 if (exitStatus) {
                     System.exit(1);
                 }
-
-                if (changeMode) client.isUdp = !client.isUdp;
             }
         } catch (IOException e) {
             e.printStackTrace();
