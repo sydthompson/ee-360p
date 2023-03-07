@@ -36,26 +36,10 @@ public class BookServer {
 
         while (true) {
             //Create socket and spawn threads based on UDP or TCP as needed from here
-            try{
-                //TODO: Put UDP and TCP listeners on separate threads
+            // UDP and TCP listeners on separate threads
+            (new TcpThread(server)).run();
 
-                //Listen first then create a thread once the message is received
-                byte[] udpBuffer = new byte[2048];
-                DatagramPacket packet = new DatagramPacket(udpBuffer, udpBuffer.length);
-                System.out.println("Connection waiting");
-                server.udpSocket.receive(packet);
-                System.out.println("Connection accepted, handing off");
-                /* UDP Listener */
-                new Thread(new UdpClientHandler(server.udpSocket, server, packet)).start();
-
-//                // Blocks until connection established
-//                Socket s = server.tcpSocket.accept();
-//                System.out.println("Connection accepted, handing off");
-//                // Hand off the socket to a thread to manage the connection
-//                new Thread(new TcpClientHandler(s, server)).start();
-            } catch (SocketException e) {
-                e.printStackTrace();
-            }
+            (new UdpThread(server)).run();
         }
     }
 
