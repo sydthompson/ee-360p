@@ -20,11 +20,12 @@ public class BookClient {
 
     FileWriter writer;
 
-    public BookClient() throws IOException {
+    public BookClient(int clientId) throws IOException {
         this.hostAddress = "localhost";
         this.tcpPort = 7000;
         this.udpPort = 8000;
         this.isUdp = true;
+        this.clientId = clientId;
 
         this.writer = new FileWriter(new File(String.format("out_%d.txt", clientId)));
 
@@ -100,7 +101,6 @@ public class BookClient {
     public static void main(String[] args) {
 
         try {
-            BookClient client = new BookClient();
 
             if (args.length != 2) {
                 System.out.println("ERROR: Provide 2 arguments: command-file, clientId");
@@ -110,7 +110,8 @@ public class BookClient {
             }
 
             String commandFile = args[0];
-            client.clientId = Integer.parseInt(args[1]);
+            BookClient client = new BookClient(Integer.parseInt(args[1]));
+
 
             Scanner sc = new Scanner(new FileReader(commandFile));
 
