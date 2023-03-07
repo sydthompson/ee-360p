@@ -1,13 +1,6 @@
-import java.io.ByteArrayInputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.util.HashMap;
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
 
 
 public class UdpClientHandler implements Runnable{
@@ -64,7 +57,7 @@ public class UdpClientHandler implements Runnable{
                 break;
             case 1:
                 int numBooks = bookServer.inventory.get(r.title);
-                if(!bookServer.inventory.contains(r.title) || numBooks <= 0) {
+                if(!(bookServer.inventory.get(r.title) == null) || numBooks <= 0) {
                     response = "Request failed - We do not have this book";
                 }
                 else {
@@ -72,23 +65,23 @@ public class UdpClientHandler implements Runnable{
                     int y = bookServer.loanNumber.incrementAndGet();
                    
                     LoanInfo myInfo = new LoanInfo(r.title, r.user);
-
+    
                     bookServer.loanMap.put(y, myInfo);
                     response = String.format("Your request has been approved, %d, %s %s", 
                                                     y, r.user, r.title);
                 } break;
             case 2:
                 int a = 2;
-                if(!bookServer.loanMap.contains(Integer.parseInt(r.loanId))) {
+                if(bookServer.loanMap.get(Integer.parseInt(r.loanId)) == null) {
                     response = String.format("%s not found, no such borrow record", r.loanId);
                 }
                 else {
                     String bookTitle = bookServer.loanMap.get(Integer.parseInt(r.loanId)).title;
                     int y = bookServer.inventory.get(bookTitle);
-
+    
                     bookServer.inventory.put(bookTitle, y + 1);
                     bookServer.loanMap.remove(Integer.parseInt(r.loanId));
-
+    
                     response = String.format("%s is returned", r.loanId);
                 } break;
             case 3:
@@ -108,7 +101,7 @@ public class UdpClientHandler implements Runnable{
             case 5:
                 int c = 4;
                 //to-do: inform server to stop processing commands from this client
-                FileWriter fileWriter = new FileWriter("inventory.txt", false);
+                FileWriter fileWriter = new FileWriter(new File("inventory.txt"), false);
                 fileWriter.write(bookServer.checkInventory());
                 fileWriter.close();
                 response = "Closing connection with client";

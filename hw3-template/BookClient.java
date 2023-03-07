@@ -8,7 +8,7 @@ public class BookClient {
     String hostAddress;
     int tcpPort;
     int udpPort;
-    boolean isUdp;
+    boolean isUdp = true;
 
     int clientId;
 
@@ -18,6 +18,8 @@ public class BookClient {
 
     DatagramSocket datagramSocket;
 
+    FileWriter writer;
+
     public BookClient() throws IOException {
         this.hostAddress = "localhost";
         this.tcpPort = 7000;
@@ -26,6 +28,8 @@ public class BookClient {
 
         //Initialize socket for UDP
         this.datagramSocket = new DatagramSocket();
+
+        this.writer = new FileWriter(new File(String.format("out_%d", clientId)));
     }
 
     public String sendTcp(Request r) throws IOException {
@@ -37,6 +41,10 @@ public class BookClient {
             System.out.println("Getting response");
             // Expect the server to return only string responses
             String response = (String) tcpOis.readObject();
+
+            writer.write(response + "\n");
+            writer.flush();
+
             return response;
         } catch(Exception e) {
             System.err.println(e);
@@ -58,7 +66,13 @@ public class BookClient {
            DatagramPacket rPacket = new DatagramPacket(rbuffer, rbuffer.length);
            datagramSocket.receive(rPacket);
 
-           return new String(rPacket.getData(), 0, rPacket.getLength());
+
+           String response = new String(rPacket.getData(), 0, rPacket.getLength());
+
+            writer.write(response + "\n");
+            writer.flush();
+
+            return response;
 
        } catch (Exception e) {
            System.err.println(e);
@@ -95,8 +109,8 @@ public class BookClient {
                 //Each line corresponds to one command, `r` will be piped to relevant transmission method
                 Request r;
 
-                String cmd = sc.nextLine();
-                String[] tokens = cmd.split(" ");
+                String cmd = sc.nextLine().trim();
+                String[] tokens = cmd.split("\\s+");
 
                 //
                 if (tokens[0].equals("set-mode")) {                             // 0
@@ -105,6 +119,10 @@ public class BookClient {
                     //        tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
                     //        tcpOis = new ObjectInputStream(tcpPa.getInputStream());
                     if(tokens[1].equals("u")) { r.setUdp = true; }
+                    else { 
+                        r.setUdp = false; 
+                        client.isUdp = false;
+                    }
                 } else if (tokens[0].equals("begin-loan")) {                    // 1
                     // Use regex pattern to avoid having to deal with quoted titles
                     Pattern p = Pattern.compile("begin-loan (.*) (\".*\")");
@@ -118,15 +136,26 @@ public class BookClient {
                     r = new Request(1);
                     r.user = user;
                     r.title = title;
-                } else if (tokens[0].equals("end-loan")) {                      // 2
+
+                } else if (tokens[0].equals("end-loan")) {                   // 2
                     r = new Request(2);
+                    r.loanId = tokens[1];
+
                 } else if (tokens[0].equals("get-loans")) {                     // 3
                     r = new Request(3);
+                    r.user = tokens[1];
+
                 } else if (tokens[0].equals("get-inventory")) {                 // 4
                     r = new Request(4);
+
                 } else if (tokens[0].equals("exit")) {                          // 5
                     r = new Request(5);
+                    client.writer.flush();
+                    client.writer.close();
+                    System.exit(0);
+                    
                 } else {
+
                     System.out.println("ERROR: No such command");
                     continue;
                 }
