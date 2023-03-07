@@ -7,7 +7,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.*;
 
 public class BookServer {
-    //TODO: UDP queue, HashMap
     int tcpPort = 7000, udpPort= 8000;
     DatagramSocket udpSocket;
     ServerSocket tcpSocket;

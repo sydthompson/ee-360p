@@ -8,7 +8,7 @@ public class BookClient {
     String hostAddress;
     int tcpPort;
     int udpPort;
-    boolean isUdp = true;
+    boolean isUdp = false;
 
     int clientId;
 
@@ -27,20 +27,14 @@ public class BookClient {
         this.isUdp = true;
 
         this.writer = new FileWriter(new File(String.format("out_%d.txt", clientId)));
-    }
 
-    public void startUdp() throws IOException {
         // Starts a UDP connection
-        System.out.println("Start UDP");
         datagramSocket = new DatagramSocket();
-        System.out.println("Started");
-    }
 
-    public void startTcp() throws IOException {
+        // Starts a TCP connection with appropriate I/O streams
         tcpPa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
         tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
         tcpOis = new ObjectInputStream(tcpPa.getInputStream());
-        System.out.println("Start");
     }
 
     public String sendTcp(Request r) throws IOException {
@@ -107,7 +101,6 @@ public class BookClient {
 
         try {
             BookClient client = new BookClient();
-            client.startUdp();
 
             if (args.length != 2) {
                 System.out.println("ERROR: Provide 2 arguments: command-file, clientId");
@@ -125,7 +118,7 @@ public class BookClient {
             while (sc.hasNextLine()) {
                 //Each line corresponds to one command, `r` will be piped to relevant transmission method
                 Request r;
-                Boolean exitStatus = false, closeUdp = false, closeTcp = false;
+                Boolean exitStatus = false, changeMode = false;
 
                 String cmd = sc.nextLine().trim();
                 String[] tokens = cmd.split("\\s+");
@@ -133,15 +126,11 @@ public class BookClient {
                 //
                 if (tokens[0].equals("set-mode")) {                             // 0
                     r = new Request(0);
-                    System.out.println(tokens[1]);
+                    changeMode = true;
                     if (tokens[1].equals("u") && client.isUdp == false) {
                         r.setUdp = true;
-                        client.isUdp = true;
-                        closeTcp = true;
                     } else if (tokens[1].equals("t") && client.isUdp == true) {
                         r.setUdp = false;
-                        client.isUdp = false;
-                        closeUdp = true;
                     }
                 } else if (tokens[0].equals("begin-loan")) {                    // 1
                     // Use regex pattern to avoid having to deal with quoted titles
@@ -181,19 +170,7 @@ public class BookClient {
                     System.exit(1);
                 }
 
-                if (closeTcp) {
-                    client.tcpOos.flush();
-                    client.tcpOos.close();
-                    client.tcpOis.close();
-                    client.tcpPa.close();
-                    client.startUdp();
-                } else if (closeUdp) {
-                    System.out.println("Closing UDP");
-                    client.datagramSocket.close();
-                    System.out.println("Closed");
-                    client.startTcp();
-                    System.out.println("Started new connection");
-                }
+                if (changeMode) client.isUdp = !client.isUdp;
             }
         } catch (IOException e) {
             e.printStackTrace();

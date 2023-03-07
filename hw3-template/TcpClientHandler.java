@@ -10,8 +10,6 @@ public class TcpClientHandler implements Runnable {
     ObjectOutputStream oos;
     ObjectInputStream ois;
 
-    Boolean shutDown = false;
-
     public TcpClientHandler(Socket socket, BookServer bookServer) throws IOException{
         this.socket = socket;
         this.bookServer = bookServer;
@@ -27,14 +25,6 @@ public class TcpClientHandler implements Runnable {
 
             oos.writeObject(response);
             oos.flush();
-
-            if (shutDown) {
-                oos.flush();
-                oos.close();
-                ois.close();
-                socket.close();
-                Thread.currentThread().interrupt();
-            }
         } catch(Exception e) {
             System.err.println(e);
         }
@@ -46,7 +36,6 @@ public class TcpClientHandler implements Runnable {
             case 0:
                 if (r.setUdp) {
                     response = "The communication mode is set to UDP";
-                    shutDown = true;
                 } else {
                     response = "The communication mode is set to TCP";
                 }

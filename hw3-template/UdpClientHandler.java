@@ -10,8 +10,6 @@ public class UdpClientHandler implements Runnable{
     DatagramSocket socket;
     DatagramPacket packet;
 
-    boolean shutDown = false;
-
     public UdpClientHandler(DatagramSocket socket, BookServer bookServer, DatagramPacket packet) throws IOException{
         this.socket = new DatagramSocket();
         this.packet = packet;
@@ -23,11 +21,6 @@ public class UdpClientHandler implements Runnable{
             Request r = receive(packet);
             String response = processCommand(r);
             send(response);
-
-            if (shutDown) {
-                socket.close();
-                Thread.currentThread().interrupt();
-            }
         } catch (Exception e) {
             System.err.println(e);
         }
@@ -58,7 +51,6 @@ public class UdpClientHandler implements Runnable{
                     response = "The communication mode is set to UDP";
                 } else {
                     response = "The communication mode is set to TCP";
-                    shutDown = true;
                 }
                 break;
             case 1:
