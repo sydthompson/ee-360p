@@ -20,11 +20,13 @@ public class TcpClientHandler implements Runnable {
 
     public void run() {
         try {
-            Request r = (Request) ois.readObject();
-            String response = processCommand(r);
+            while(true) {
+                Request r = (Request) ois.readObject();
+                String response = processCommand(r);
 
-            oos.writeObject(response);
-            oos.flush();
+                oos.writeObject(response);
+                oos.flush();
+            }
         } catch(Exception e) {
             System.err.println(e);
         }
