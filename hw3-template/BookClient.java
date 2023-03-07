@@ -102,9 +102,13 @@ public class BookClient {
                 //
                 if (tokens[0].equals("set-mode")) {                             // 0
                     r = new Request(0);
+<<<<<<< HEAD
                     //        tcpPa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
                     //        tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
                     //        tcpOis = new ObjectInputStream(tcpPa.getInputStream());
+=======
+                    if(tokens[1].equals("u")) { r.setUdp = true; }
+>>>>>>> d5365e5c2b0280d5570d32ed74abbc354984599d
                 } else if (tokens[0].equals("begin-loan")) {                    // 1
                     // Use regex pattern to avoid having to deal with quoted titles
                     Pattern p = Pattern.compile("begin-loan (.*) (\".*\")");
