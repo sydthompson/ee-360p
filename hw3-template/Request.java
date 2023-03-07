@@ -8,7 +8,7 @@ public class Request implements Serializable {
     boolean setUdp = false;
     String user;
     String title;
-    String loanId;
+    Integer loanId;
 
     public Request(int id) {
         this.operationId = id;

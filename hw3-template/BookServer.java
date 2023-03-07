@@ -34,13 +34,10 @@ public class BookServer {
         File init = new File(fileName);
         server.inventory = parseFile(init);
 
-        while (true) {
-            //Create socket and spawn threads based on UDP or TCP as needed from here
-            // UDP and TCP listeners on separate threads
-            (new TcpThread(server)).run();
-
-            (new UdpThread(server)).run();
-        }
+        //Create socket and spawn threads based on UDP or TCP as needed from here
+        // UDP and TCP listeners on separate threads
+        new Thread(new TcpThread(server)).start();
+        new Thread(new UdpThread(server)).start();
     }
 
     static ConcurrentHashMap<String, Integer> parseFile(File file) throws FileNotFoundException {

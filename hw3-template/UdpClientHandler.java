@@ -10,9 +10,10 @@ public class UdpClientHandler implements Runnable{
     DatagramSocket socket;
     DatagramPacket packet;
 
+    boolean shutDown = false;
+
     public UdpClientHandler(DatagramSocket socket, BookServer bookServer, DatagramPacket packet) throws IOException{
         this.socket = new DatagramSocket();
-        System.out.println(bookServer.udpPort);
         this.packet = packet;
         this.bookServer = bookServer;
     }
@@ -22,6 +23,11 @@ public class UdpClientHandler implements Runnable{
             Request r = receive(packet);
             String response = processCommand(r);
             send(response);
+
+            if (shutDown) {
+                socket.close();
+                Thread.currentThread().interrupt();
+            }
         } catch (Exception e) {
             System.err.println(e);
         }
@@ -48,44 +54,48 @@ public class UdpClientHandler implements Runnable{
         String response = "ERROR";
         switch (r.operationId) {
             case 0:
-                int x = 1;
                 if(r.setUdp) {
                     response = "The communication mode is set to UDP";
                 } else {
                     response = "The communication mode is set to TCP";
+                    shutDown = true;
                 }
                 break;
             case 1:
+                if(!(bookServer.inventory.containsKey(r.title))) {
+                    response = "Request Failed - We do not have this book";
+                    break;
+                }
                 int numBooks = bookServer.inventory.get(r.title);
-                if(!(bookServer.inventory.get(r.title) == null) || numBooks <= 0) {
-                    response = "Request failed - We do not have this book";
+                if (numBooks <= 0) {
+                    response = "Request Failed - Book not available";
+                    break;
                 }
-                else {
-                    bookServer.inventory.put(r.title, numBooks - 1);
-                    int y = bookServer.loanNumber.incrementAndGet();
-                   
-                    LoanInfo myInfo = new LoanInfo(r.title, r.user);
-    
-                    bookServer.loanMap.put(y, myInfo);
-                    response = String.format("Your request has been approved, %d, %s %s", 
-                                                    y, r.user, r.title);
-                } break;
+
+                bookServer.inventory.put(r.title, numBooks - 1);
+                int newLoanNum = bookServer.loanNumber.incrementAndGet();
+
+                LoanInfo myInfo = new LoanInfo(r.title, r.user);
+
+                bookServer.loanMap.put(newLoanNum, myInfo);
+                response = String.format("Your request has been approved, %d, %s %s",
+                                                newLoanNum, r.user, r.title);
+                break;
             case 2:
-                int a = 2;
-                if(bookServer.loanMap.get(Integer.parseInt(r.loanId)) == null) {
-                    response = String.format("%s not found, no such borrow record", r.loanId);
+                System.out.println(r.loanId);
+                if(bookServer.loanMap.get(r.loanId) == null) {
+                    response = String.format("%d not found, no such borrow record", r.loanId);
                 }
                 else {
-                    String bookTitle = bookServer.loanMap.get(Integer.parseInt(r.loanId)).title;
-                    int y = bookServer.inventory.get(bookTitle);
+                    String bookTitle = bookServer.loanMap.get(r.loanId).title;
+                    int num = bookServer.inventory.get(bookTitle);
     
-                    bookServer.inventory.put(bookTitle, y + 1);
-                    bookServer.loanMap.remove(Integer.parseInt(r.loanId));
+                    bookServer.inventory.put(bookTitle, num + 1);
+                    bookServer.loanMap.remove(r.loanId);
     
-                    response = String.format("%s is returned", r.loanId);
+                    response = String.format("%d is returned", r.loanId);
                 } break;
             case 3:
-                int b = 3;
                 response = "";
                 for(int loanId: bookServer.loanMap.keySet()) {
                     LoanInfo info = bookServer.loanMap.get(loanId);
@@ -99,7 +109,6 @@ public class UdpClientHandler implements Runnable{
                 response = bookServer.checkInventory();
                 break;
             case 5:
-                int c = 4;
                 //to-do: inform server to stop processing commands from this client
                 FileWriter fileWriter = new FileWriter(new File("inventory.txt"), false);
                 fileWriter.write(bookServer.checkInventory());
