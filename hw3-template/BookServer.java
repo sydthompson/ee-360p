@@ -33,8 +33,7 @@ public class BookServer {
         File init = new File(fileName);
         server.inventory = parseFile(init);
 
-        //Create socket and spawn threads based on UDP or TCP as needed from here
-        // UDP and TCP listeners on separate threads
+        // UDP and TCP listeners on separate threads and will spawn handler threads for clients as needed
         new Thread(new TcpThread(server)).start();
         new Thread(new UdpThread(server)).start();
     }

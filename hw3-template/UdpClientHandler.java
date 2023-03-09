@@ -1,6 +1,5 @@
 import java.io.*;
 import java.net.*;
-import java.util.Scanner;
 
 
 public class UdpClientHandler implements Runnable{
@@ -10,7 +9,7 @@ public class UdpClientHandler implements Runnable{
     DatagramSocket socket;
     DatagramPacket packet;
 
-    public UdpClientHandler(DatagramSocket socket, BookServer bookServer, DatagramPacket packet) throws IOException{
+    public UdpClientHandler(BookServer bookServer, DatagramPacket packet) throws IOException{
         this.socket = new DatagramSocket();
         this.packet = packet;
         this.bookServer = bookServer;

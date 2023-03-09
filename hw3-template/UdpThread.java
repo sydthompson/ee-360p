@@ -16,9 +16,8 @@ class UdpThread implements Runnable {
             DatagramPacket packet = new DatagramPacket(udpBuffer, udpBuffer.length);
             try {
                 server.udpSocket.receive(packet);
-                System.out.println("UDP connection accepted, handing off");
                 /* UDP Listener */
-                new Thread(new UdpClientHandler(server.udpSocket, server, packet)).start();
+                new Thread(new UdpClientHandler(server, packet)).start();
             } catch (Exception e) {
                 e.printStackTrace(System.out);
             }

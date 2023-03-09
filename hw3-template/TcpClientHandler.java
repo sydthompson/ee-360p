@@ -1,6 +1,5 @@
 import java.io.*;
 import java.net.*;
-import java.util.Scanner;
 
 public class TcpClientHandler implements Runnable {
 
@@ -10,7 +9,8 @@ public class TcpClientHandler implements Runnable {
     ObjectOutputStream oos;
     ObjectInputStream ois;
 
-    Boolean clientRunning = true;
+    Boolean clientRunning = true,
+            closing = false;
 
     public TcpClientHandler(Socket socket, BookServer bookServer) throws IOException{
         this.socket = socket;
@@ -28,20 +28,20 @@ public class TcpClientHandler implements Runnable {
 
                 oos.writeObject(response);
                 oos.flush();
+
+                if (closing) closeOut();
             }
         } catch(Exception e) {
-            //
-        } finally {
-            try {
-                if (!clientRunning) {
-                    oos.flush();
-                    oos.close();
-                    ois.close();
-                }
-            } catch (IOException io) {
-                //
-            }
+            e.printStackTrace();
         }
+    }
+
+    public void closeOut() throws IOException {
+        oos.flush();
+        oos.close();
+        ois.close();
+        socket.close();
+        clientRunning = false;
     }
 
     public String processCommand(Request r) throws IOException {
@@ -50,6 +50,7 @@ public class TcpClientHandler implements Runnable {
             case 0:
                 if (r.setUdp) {
                     response = "The communication mode is set to UDP";
+                    closing = true;
                 } else {
                     response = "The communication mode is set to TCP";
                 }
@@ -110,7 +111,8 @@ public class TcpClientHandler implements Runnable {
                 fileWriter.write(bookServer.checkInventory());
                 fileWriter.close();
                 response = "Closing connection with client";
-                clientRunning = false;
+
+                closing = true;
                 break;
         }
         return response;

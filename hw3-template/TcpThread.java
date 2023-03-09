@@ -14,7 +14,6 @@ class TcpThread implements Runnable {
         while (true) {
             try {
                 Socket s = server.tcpSocket.accept();
-                System.out.println("TCP connection accepted, handing off");
                 // Hand off the socket to a thread to manage the connection
                 new Thread(new TcpClientHandler(s, server)).start();
             } catch (Exception e) {

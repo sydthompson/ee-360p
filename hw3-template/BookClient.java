@@ -8,7 +8,7 @@ public class BookClient {
     String hostAddress;
     int tcpPort;
     int udpPort;
-    boolean isUdp = false;
+    boolean isUdp = true;
 
     int clientId;
 
@@ -28,13 +28,7 @@ public class BookClient {
 
         this.writer = new FileWriter(new File(String.format("out_%d.txt", clientId)));
 
-        // Starts a UDP connection
-        datagramSocket = new DatagramSocket();
-
-        // Starts a TCP connection with appropriate I/O streams
-        tcpPa = new Socket(InetAddress.getByName(this.hostAddress), this.tcpPort);
-        tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
-        tcpOis = new ObjectInputStream(tcpPa.getInputStream());
+        openUdp();
     }
 
     public String sendTcp(Request r) throws IOException {
@@ -57,7 +51,15 @@ public class BookClient {
 
     public String sendUdp(Request r) throws IOException {
        try {
-           byte[] buffer = getByteArray(r);
+           ByteArrayOutputStream stream = new ByteArrayOutputStream();
+           ObjectOutputStream write = new ObjectOutputStream(stream);
+           write.writeObject(r);
+           write.flush();
+
+           byte[] buffer = stream.toByteArray();
+
+           write.close();
+           stream.close();
 
            DatagramPacket packet = new DatagramPacket(buffer,
                    buffer.length,
@@ -83,22 +85,31 @@ public class BookClient {
         return "";
     }
 
-    private byte[] getByteArray(Request r) throws IOException {
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        ObjectOutputStream write = new ObjectOutputStream(stream);
-        write.writeObject(r);
-        write.flush();
+    public void openTcp() throws IOException {
+        // Starts a TCP connection with appropriate I/O streams
+        tcpPa = new Socket(InetAddress.getByName(hostAddress), tcpPort);
+        tcpOos = new ObjectOutputStream(tcpPa.getOutputStream());
+        tcpOis = new ObjectInputStream(tcpPa.getInputStream());
+    }
 
-        byte[] convert = stream.toByteArray();
+    public void openUdp() throws IOException {
+        // Starts a UDP connection
+        datagramSocket = new DatagramSocket();
+    }
 
-        write.close();
-        stream.close();
+    public void closeTcp() throws IOException {
+        tcpOos.flush();
+        tcpOis.close();
+        tcpOos.close();
+        tcpPa.close();
+    }
 
-        return convert;
+    public void closeUdp() throws IOException {
+        datagramSocket.close();
     }
 
     public static void main(String[] args) throws IOException {
-        Boolean exitStatus = true;
+
         BookClient client = new BookClient(Integer.parseInt(args[1]));
 
         try {
@@ -114,22 +125,37 @@ public class BookClient {
 
             Scanner sc = new Scanner(new FileReader(commandFile));
 
-            while (sc.hasNextLine()) {
-                //Each line corresponds to one command, `r` will be piped to relevant transmission method
-                Request r;
+            //Each line corresponds to one command, `r` will be piped to relevant transmission method
+            Request r;
 
+            while (sc.hasNextLine()) {
                 String cmd = sc.nextLine().trim();
                 String[] tokens = cmd.split("\\s+");
 
                 //
                 if (tokens[0].equals("set-mode")) {                             // 0
                     r = new Request(0);
+                    // Switch to UDP mode if applicable
                     if (tokens[1].equals("u") && client.isUdp == false) {
                         r.setUdp = true;
                         client.isUdp = true;
+                        // Open socket
+                        client.openUdp();
+                        /*
+                        To properly close TCP, send an on-the-fly
+                        message to the TCP handler to shut down
+                        */
+                        Request switchMode = new Request(0);
+                        switchMode.setUdp = true;
+                        client.sendTcp(switchMode);
+                        client.closeTcp();
+                    // Switch to TCP mode if applicable
                     } else if (tokens[1].equals("t") && client.isUdp == true) {
                         r.setUdp = false;
                         client.isUdp = false;
+                        // Open socket with streams
+                        client.openTcp();
+                        client.closeUdp();
                     }
                 } else if (tokens[0].equals("begin-loan")) {                    // 1
                     // Use regex pattern to avoid having to deal with quoted titles
@@ -152,12 +178,11 @@ public class BookClient {
                     r = new Request(4);
                 } else if (tokens[0].equals("exit")) {                          // 5
                     r = new Request(5);
-                    exitStatus = true;
                 } else {
                     System.out.println("ERROR: No such command");
                     continue;
                 }
-                // Send message then check for exit status
+
                 if (client.isUdp) {
                     System.out.println(client.sendUdp(r));
                 } else {
@@ -167,16 +192,17 @@ public class BookClient {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            if (exitStatus) {
-                client.datagramSocket.close();
-                client.tcpOos.flush();
-                client.tcpOis.close();
-                client.tcpOos.close();
-                client.tcpPa.close();
-                client.writer.flush();
-                client.writer.close();
-                System.exit(1);
+            // Close appropriate resources
+            if (client.isUdp) {
+                client.closeUdp();
+            } else {
+                client.closeTcp();
             }
+
+            client.writer.flush();
+            client.writer.close();
+
+            System.exit(1);
         }
     }
 }

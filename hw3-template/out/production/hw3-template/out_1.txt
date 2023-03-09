@@ -1,0 +1,14 @@
+The communication mode is set to TCP
+Your request has been approved, 5, Mike "Divergent"
+The communication mode is set to UDP
+The communication mode is set to UDP
+Your request has been approved, 6, Lucy "Divergent"
+1 "Divergent"
+3 "Divergent"
+5 "Divergent"
+"The Letter" 1
+"The Count of Monte Cristo" 17
+"The Great Gatsby" 15
+"Divergent" 4
+The communication mode is set to TCP
+Closing connection with client
