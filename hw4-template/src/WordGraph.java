@@ -76,7 +76,12 @@ public final class WordGraph {
 			cooccurrences.mapToPair(s -> new Tuple2<>(s, 1));
 
 		JavaPairRDD<Tuple2<String, String>, Integer> reduceCoccurrenceCount =
-			mapCooccurenceCount.reduceByKey()
+			mapCooccurenceCount.reduceByKey(new Function2<Integer, Integer, Integer>() {
+				public Integer call(Integer i1, Integer i2) {
+					return i1+i2;
+				}
+			}
+			);
 			
 		// PairRDD 2: Take the cooccurrences, map the cooccurrence s.t. element 1 of the tuple is the key
 		// and element 2 is the value. This allows reduction s.t. we obtain the general # of outgoing edges
@@ -89,6 +94,8 @@ public final class WordGraph {
 		for (Tuple2<String, String> pair:cooccurrences.collect()) {
             System.out.println(String.format("(%s, %s)", pair._1(), pair._2()));
         }
+
+		spark.close();
 
     }
 }
