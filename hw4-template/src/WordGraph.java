@@ -74,14 +74,30 @@ public final class WordGraph {
 		
 		JavaPairRDD<Tuple2<String, String>, Integer> mapCooccurenceCount = 
 			cooccurrences.mapToPair(s -> new Tuple2<>(s, 1));
+		
 
+		// counting number of times predecessor p-word appears in map
+		JavaPairRDD<String, Integer> numFirst = 
+			cooccurrences.mapToPair(s -> new Tuple2<>(s._1(), 1));
+
+		JavaPairRDD<String, Integer> reduceNumFirst =
+			numFirst.reduceByKey(new Function2<Integer, Integer, Integer>() {
+				public Integer call(Integer i1, Integer i2) {
+					return i1+i2;
+				}
+			});
+
+		Map<String, Integer> firstCount = reduceNumFirst.collectAsMap();
+		// each pair maps to number of occurences of word1->word2
 		JavaPairRDD<Tuple2<String, String>, Integer> reduceCoccurrenceCount =
 			mapCooccurenceCount.reduceByKey(new Function2<Integer, Integer, Integer>() {
 				public Integer call(Integer i1, Integer i2) {
 					return i1+i2;
 				}
-			}
-			);
+			});
+
+		JavaPairRDD<Tuple2<String, String>, Double> mapEdges = reduceCoccurrenceCount.map(
+			s -> new Tuple2<>(s._1(), (s._2()* 1.0 / firstCount.get(s._1()._1()))));
 			
 		// PairRDD 2: Take the cooccurrences, map the cooccurrence s.t. element 1 of the tuple is the key
 		// and element 2 is the value. This allows reduction s.t. we obtain the general # of outgoing edges
