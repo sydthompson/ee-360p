@@ -107,28 +107,24 @@ public final class WordGraph {
 		);
 		
 		//Print out a PairRDD
-		// Map<Tuple2<String, String>, Double> counts = edgeWeights.collectAsMap();
+		Map<Tuple2<String, String>, Double> counts = edgeWeights.collectAsMap();
 
-		// for (Map.Entry entry:counts.entrySet()) {
-		// 	System.out.println(String.format("(%s, %f)", entry.getKey(), entry.getValue()));
-        // }
+		for (Map.Entry entry:counts.entrySet()) {
+			System.out.println(String.format("(%s, %f)", entry.getKey(), entry.getValue()));
+        }
 		
 
-		ConcurrentHashMap<String, ConcurrentHashMap<String, Double>> edges = new ConcurrentHashMap<>();
-		edgeWeights.foreach(new VoidFunction<Tuple2<Tuple2<String,String>,Double>>() {
-			@Override
-			public void call(Tuple2<Tuple2<String, String>, Double> t) throws Exception {
-				Map<String, Double> myMap = edges.putIfAbsent(t._1()._1(), new ConcurrentHashMap<>());
-				myMap.put(t._1()._2(), t._2());
-			}
-			
-		});
+		HashMap<String, HashMap<String, Double>> edges = new HashMap<>();
+		for(Tuple2<String, String> tuple: counts.keySet()) {
+			Map<String, Double> myMap = edges.putIfAbsent(tuple._1(), new HashMap<>());
+			myMap.put(tuple._2(), counts.get(tuple));
+		}
 
 		File file = new File(args[1]);
 		PrintWriter writer = new PrintWriter(file);
 
 		for (String entry:edges.keySet()) {
-			ConcurrentHashMap<String, Double> currentEdgeMap = edges.get(entry);
+			HashMap<String, Double> currentEdgeMap = edges.get(entry);
 			String output = String.format("(%s, %d)", entry, currentEdgeMap.size());
 			writer.println(output);
 			System.out.println(output);
