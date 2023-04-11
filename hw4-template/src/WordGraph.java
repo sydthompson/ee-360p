@@ -10,6 +10,7 @@ import com.google.common.collect.Lists;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -113,11 +114,11 @@ public final class WordGraph {
         // }
 		
 
-		HashMap<String, HashMap<String, Double>> edges = new HashMap<>();
+		ConcurrentHashMap<String, ConcurrentHashMap<String, Double>> edges = new ConcurrentHashMap<>();
 		edgeWeights.foreach(new VoidFunction<Tuple2<Tuple2<String,String>,Double>>() {
 			@Override
 			public void call(Tuple2<Tuple2<String, String>, Double> t) throws Exception {
-				Map<String, Double> myMap = edges.putIfAbsent(t._1()._1(), new HashMap<>());
+				Map<String, Double> myMap = edges.putIfAbsent(t._1()._1(), new ConcurrentHashMap<>());
 				myMap.put(t._1()._2(), t._2());
 			}
 			
@@ -127,7 +128,7 @@ public final class WordGraph {
 		PrintWriter writer = new PrintWriter(file);
 
 		for (String entry:edges.keySet()) {
-			HashMap<String, Double> currentEdgeMap = edges.get(entry);
+			ConcurrentHashMap<String, Double> currentEdgeMap = edges.get(entry);
 			String output = String.format("(%s, %d)", entry, currentEdgeMap.size());
 			writer.println(output);
 			System.out.println(output);
