@@ -134,7 +134,7 @@ public final class WordGraph {
 			System.out.println(output);
 
 			for(String currentEdge: currentEdgeMap.keySet()) {
-				String output2 = String.format("<%s, %f.2>", currentEdge, currentEdgeMap.get(currentEdge));
+				String output2 = String.format("<%s, %.3f>", currentEdge, currentEdgeMap.get(currentEdge));
 				writer.println(output2);
 				System.out.println(output2);
 			}
