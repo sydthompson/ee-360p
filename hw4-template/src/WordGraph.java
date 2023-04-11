@@ -124,12 +124,12 @@ public final class WordGraph {
 			myMap.put(tuple._2(), counts.get(tuple));
 		}
 
-		File file = new File(args[1]);
+		File file = new File("output.txt");
 		PrintWriter writer = new PrintWriter(file);
 
 		for (String entry:edges.keySet()) {
 			HashMap<String, Double> currentEdgeMap = edges.get(entry);
-			String output = String.format("(%s, %d)", entry, currentEdgeMap.size());
+			String output = String.format("%s, %d", entry, currentEdgeMap.size());
 			writer.println(output);
 			System.out.println(output);
 
