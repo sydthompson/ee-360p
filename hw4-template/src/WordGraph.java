@@ -49,6 +49,7 @@ public final class WordGraph {
 		// Use custom in-line flatmapfunction to iterate the list and create Tuple2 objects
 		// Once the tuples for a line are created we don't care about keeping sentences together
 		JavaRDD<Tuple2<String, String>> cooccurrences = words.flatMap(new FlatMapFunction<ArrayList<String>, Tuple2<String, String>>() {
+
 			public Iterator<Tuple2<String, String>> call(ArrayList<String> s) {
 				// List to populate with co-occurrences
 				ArrayList<Tuple2<String,String>> pairs = new ArrayList<Tuple2<String, String>>();
@@ -69,46 +70,45 @@ public final class WordGraph {
 
 		// We now have a flatmapped RDD containing Tuple2, we should now remap the data FOR the actual MapReduce step(s), aka translate to PairRDDs
 
-		// PairRDD 1: Take the cooccurrences, map the cooccurence s.t. it is the key, and has a value of 1
+		// PairRDD 1: Take the cooccurrences, map the cooccurrence s.t. it is the key, and has a value of 1
 		// Thus we are able to derive the number of occurrences of the cooccurrence in the reduce step
-		
-		JavaPairRDD<Tuple2<String, String>, Integer> mapCooccurenceCount = 
+		JavaPairRDD<Tuple2<String, String>, Integer> mapCooccurrenceCount = 
 			cooccurrences.mapToPair(s -> new Tuple2<>(s, 1));
-		
 
-		// counting number of times predecessor p-word appears in map
-		JavaPairRDD<String, Integer> numFirst = 
+		JavaPairRDD<Tuple2<String, String>, Integer> reduceCooccurrenceCount =
+			mapCooccurrenceCount.reduceByKey(new Function2<Integer, Integer, Integer>() {
+				public Integer call(Integer i1, Integer i2) {
+					return i1+i2;
+				}
+			});
+
+		// PairRDD 2: Take the cooccurrences, map the cooccurrence s.t. element 1 of the tuple is the key
+		// and 1 is the value. This allows reduction s.t. we obtain the general # of outgoing edges corresponding to
+		// the predecessor
+		JavaPairRDD<String, Integer> mapOutgoingEdges = 
 			cooccurrences.mapToPair(s -> new Tuple2<>(s._1(), 1));
 
-		JavaPairRDD<String, Integer> reduceNumFirst =
-			numFirst.reduceByKey(new Function2<Integer, Integer, Integer>() {
+		JavaPairRDD<String, Integer> reduceOutgoingEdges =
+			mapOutgoingEdges.reduceByKey(new Function2<Integer, Integer, Integer>() {
 				public Integer call(Integer i1, Integer i2) {
 					return i1+i2;
 				}
 			});
 
-		Map<String, Integer> firstCount = reduceNumFirst.collectAsMap();
-		// each pair maps to number of occurences of word1->word2
-		JavaPairRDD<Tuple2<String, String>, Integer> reduceCoccurrenceCount =
-			mapCooccurenceCount.reduceByKey(new Function2<Integer, Integer, Integer>() {
-				public Integer call(Integer i1, Integer i2) {
-					return i1+i2;
-				}
-			});
+		// Collect as Map for reduceOutgoingEdges
+		// Index hashmap for the p-word
+		// Map to pair with weight for reduceCooccurrenceCount
 
-		JavaPairRDD<Tuple2<String, String>, Double> mapEdges = reduceCoccurrenceCount.map(
-			s -> new Tuple2<>(s._1(), (s._2()* 1.0 / firstCount.get(s._1()._1()))));
-			
-		// PairRDD 2: Take the cooccurrences, map the cooccurrence s.t. element 1 of the tuple is the key
-		// and element 2 is the value. This allows reduction s.t. we obtain the general # of outgoing edges
+		HashMap<String, Integer> totalCountPredecessor = new HashMap<String, Integer>(reduceOutgoingEdges.collectAsMap());
 
-		JavaPairRDD<String, String> mapOutgoingEdges = 
-			cooccurrences.mapToPair(s -> new Tuple2<>(s._1(), s._2()));
-
-		// When reducing, we might need an accumulator to track the number of occurrences of a given co-occurence
-
-		for (Tuple2<String, String> pair:cooccurrences.collect()) {
-            System.out.println(String.format("(%s, %s)", pair._1(), pair._2()));
+		JavaPairRDD<Tuple2<String, String>, Double> edgeWeights = reduceCooccurrenceCount.mapToPair(
+			pair -> new Tuple2<>(pair._1(), (Double) (Double.valueOf(pair._2()) / totalCountPredecessor.get(pair._1()._1())))
+		);
+		
+		//Print out a PairRDD
+		Map<Tuple2<String, String>, Double> counts = edgeWeights.collectAsMap();
+		for (Map.Entry entry:counts.entrySet()) {
+			System.out.println(String.format("(%s, %f)", entry.getKey(), entry.getValue()));
         }
 
 		spark.close();
