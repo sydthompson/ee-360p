@@ -116,7 +116,11 @@ public final class WordGraph {
 
 		HashMap<String, HashMap<String, Double>> edges = new HashMap<>();
 		for(Tuple2<String, String> tuple: counts.keySet()) {
-			Map<String, Double> myMap = edges.putIfAbsent(tuple._1(), new HashMap<>());
+			Map<String, Double> myMap = edges.get(tuple._1());
+			if(myMap == null) {
+				edges.put(tuple._1(),new HashMap<>());
+				myMap=edges.get(tuple._1());
+			}
 			myMap.put(tuple._2(), counts.get(tuple));
 		}
 
