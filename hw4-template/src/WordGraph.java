@@ -123,13 +123,24 @@ public final class WordGraph {
 			
 		});
 
+		File file = new File(args[0]);
+		PrintWriter writer = new PrintWriter(file);
+
 		for (String entry:edges.keySet()) {
 			HashMap<String, Double> currentEdgeMap = edges.get(entry);
-			System.out.println(String.format("(%s, %d)", entry, currentEdgeMap.size()));
+			String output = String.format("(%s, %d)", entry, currentEdgeMap.size());
+			writer.println(output);
+			System.out.println(output);
+
 			for(String currentEdge: currentEdgeMap.keySet()) {
-				System.out.println(String.format("<%s, %f.2>", currentEdge, currentEdgeMap.get(currentEdge)));
+				String output2 = String.format("<%s, %f.2>", currentEdge, currentEdgeMap.get(currentEdge));
+				writer.println(output2);
+				System.out.println(output2);
 			}
 		}
+
+		writer.flush();
+		writer.close();
 
 		spark.close();
 
