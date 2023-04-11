@@ -106,10 +106,30 @@ public final class WordGraph {
 		);
 		
 		//Print out a PairRDD
-		Map<Tuple2<String, String>, Double> counts = edgeWeights.collectAsMap();
-		for (Map.Entry entry:counts.entrySet()) {
-			System.out.println(String.format("(%s, %f)", entry.getKey(), entry.getValue()));
-        }
+		// Map<Tuple2<String, String>, Double> counts = edgeWeights.collectAsMap();
+
+		// for (Map.Entry entry:counts.entrySet()) {
+		// 	System.out.println(String.format("(%s, %f)", entry.getKey(), entry.getValue()));
+        // }
+		
+
+		HashMap<String, HashMap<String, Double>> edges = new HashMap<>();
+		edgeWeights.foreach(new VoidFunction<Tuple2<Tuple2<String,String>,Double>>() {
+			@Override
+			public void call(Tuple2<Tuple2<String, String>, Double> t) throws Exception {
+				Map<String, Double> myMap = edges.putIfAbsent(t._1()._1(), new HashMap<>());
+				myMap.put(t._1()._2(), t._2());
+			}
+			
+		});
+
+		for (String entry:edges.keySet()) {
+			HashMap<String, Double> currentEdgeMap = edges.get(entry);
+			System.out.println(String.format("(%s, %d)", entry, currentEdgeMap.size()));
+			for(String currentEdge: currentEdgeMap.keySet()) {
+				System.out.println(String.format("<%s, %f.2>", currentEdge, currentEdgeMap.get(currentEdge)));
+			}
+		}
 
 		spark.close();
 
