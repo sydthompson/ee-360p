@@ -107,12 +107,7 @@ public final class WordGraph {
 		);
 		
 		//Print out a PairRDD
-		Map<Tuple2<String, String>, Double> counts = edgeWeights.collectAsMap();
-
-		for (Map.Entry entry:counts.entrySet()) {
-			System.out.println(String.format("(%s, %f)", entry.getKey(), entry.getValue()));
-        }
-		
+		Map<Tuple2<String, String>, Double> counts = edgeWeights.collectAsMap();		
 
 		HashMap<String, HashMap<String, Double>> edges = new HashMap<>();
 		for(Tuple2<String, String> tuple: counts.keySet()) {
@@ -124,19 +119,18 @@ public final class WordGraph {
 			myMap.put(tuple._2(), counts.get(tuple));
 		}
 
-		File file = new File("output.txt");
+		File file = new File(args[1]);
+		file.createNewFile();
 		PrintWriter writer = new PrintWriter(file);
 
 		for (String entry:edges.keySet()) {
 			HashMap<String, Double> currentEdgeMap = edges.get(entry);
 			String output = String.format("%s, %d", entry, currentEdgeMap.size());
 			writer.println(output);
-			System.out.println(output);
 
-			for(String currentEdge: currentEdgeMap.keySet()) {
+			for (String currentEdge: currentEdgeMap.keySet()) {
 				String output2 = String.format("<%s, %.3f>", currentEdge, currentEdgeMap.get(currentEdge));
 				writer.println(output2);
-				System.out.println(output2);
 			}
 		}
 
