@@ -124,7 +124,7 @@ public final class WordGraph {
 			
 		});
 
-		File file = new File(args[0]);
+		File file = new File(args[1]);
 		PrintWriter writer = new PrintWriter(file);
 
 		for (String entry:edges.keySet()) {
