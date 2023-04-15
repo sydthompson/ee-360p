@@ -11,6 +11,20 @@ import java.io.Serializable;
 public class Request implements Serializable {
     static final long serialVersionUID = 1L;
     // Your data here
-
+    public String type;
+    public int seqNumber;
+    public double proposalNumber;
+    public Object value;
     // Your constructor and methods here
+
+    public Request(String type, 
+                    int seqNumber, 
+                    Object value, 
+                    double proposalNumber) {
+                        
+        this.type=type;
+        this.seqNumber=seqNumber;
+        this.proposalNumber=proposalNumber;
+        this.value=value;
+    }
 }

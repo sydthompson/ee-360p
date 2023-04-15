@@ -3,6 +3,7 @@ package paxos;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -11,6 +12,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * It corresponds to a single Paxos peer.
  */
 public class Paxos implements PaxosRMI, Runnable {
+
     ReentrantLock mutex;
     String[] peers; // hostnames of all peers
     int[] ports; // ports of all peers
@@ -19,10 +21,25 @@ public class Paxos implements PaxosRMI, Runnable {
     Registry registry;
     PaxosRMI stub;
 
+    //proposer
+    int seq;
+    Object value;
+
+    //acceptor
+    int highest_prepare;
+    int highest_accept;
+    Object highest_accept_value;
+    boolean hasDecided = false;
+
+    State state;
+    int min;
+    double proposalNumber;
+
     AtomicBoolean dead; // for testing
     AtomicBoolean unreliable; // for testing
 
     // Your data here
+    ArrayList<Paxos> instances;
 
     /**
      * Call the constructor to create a Paxos peer.
@@ -39,6 +56,42 @@ public class Paxos implements PaxosRMI, Runnable {
         this.unreliable = new AtomicBoolean(false);
 
         // Your initialization code here
+        instances = new ArrayList<>();
+        seq = highest_prepare = min = -1;
+        state = State.Pending;
+        highest_accept_value=0;
+
+        proposalNumber = (Thread.currentThread().getId())/1000;
+
+        // register peers, do not modify this part
+        try {
+            System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
+            registry = LocateRegistry.createRegistry(this.ports[this.me]);
+            stub = (PaxosRMI) UnicastRemoteObject.exportObject(this, this.ports[this.me]);
+            registry.rebind("Paxos", stub);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public Paxos(int me, String[] peers, int[] ports, Object value) {
+
+        this.me = me;
+        this.peers = peers;
+        this.ports = ports;
+        this.mutex = new ReentrantLock();
+        this.dead = new AtomicBoolean(false);
+        this.unreliable = new AtomicBoolean(false);
+        this.value=value;
+
+        // Your initialization code here
+        instances = new ArrayList<>();
+        seq = highest_prepare = min = -1;
+        state = State.Pending;
+        highest_accept_value=0;
+
+        proposalNumber = (Thread.currentThread().getId())/1000;
+
 
         // register peers, do not modify this part
         try {
@@ -104,29 +157,78 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public void Start(int seq, Object value) {
         // Your code here
+        Paxos newPaxos = new Paxos(seq, peers, ports, value);
+        instances.add(newPaxos);
+        newPaxos.run();
+
+        //TODO return without waiting for thread to finish
     }
 
     @Override
     public void run() {
-        //Your code here
+        //should send out requests with seqNum with Object value 
     }
 
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
-        // your code here
-        return null;
+
+        if(req.seqNumber > highest_prepare) {
+            highest_prepare=req.seqNumber;
+            Request request = new Request("ok", 
+                    highest_accept, 
+                    highest_accept_value, 
+                    proposalNumber++);
+            return Call("Prepare", request, me);
+        }
+
+        Request request = new Request("reject", 
+                highest_accept, 
+                highest_accept_value, 
+                req.proposalNumber);
+
+        return Call("Prepare", request, me);
     }
 
     // RMI Handler for accept requests
     public Response Accept(Request req) {
-        // your code here
-        return null;
+
+        if(req.seqNumber >= highest_prepare) {
+            highest_prepare=req.seqNumber;
+            highest_accept=req.seqNumber;
+            highest_accept_value=req.value;
+            Request request = new Request("ok", 
+                req.seqNumber, 
+                req.value, 
+                req.proposalNumber);
+            return Call("Accept", request, me);
+        }
+
+        Request request = new Request("reject",
+                highest_accept,
+                highest_accept_value,
+                req.proposalNumber);
+        return Call("Accept", request, me);
     }
 
     // RMI Handler for decide requests
     public Response Decide(Request req) {
-        // your code here
-        return null;
+        if(!hasDecided) {
+            highest_accept=req.seqNumber;
+            highest_prepare=req.seqNumber;
+            highest_accept_value=req.value;
+
+            Request request = new Request("ok", 
+                req.seqNumber, 
+                req.value, 
+                req.proposalNumber);
+            return Call("Decide", request, me);
+        } 
+
+        Request request = new Request("reject", 
+                req.seqNumber, 
+                req.value, 
+                req.proposalNumber);
+            return Call("Decide", request, me);
     }
 
     /**
@@ -137,6 +239,13 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public void Done(int seq) {
         // Your code here
+        for(Paxos current: instances) {
+            if(current.seq <= min) {
+                current.Kill();
+            }
+        }
+
+        //TODO send the highest Done argument supplied by local application
     }
 
     /**
@@ -146,7 +255,7 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public int Max() {
         // Your code here
-        return -1;
+        return highest_prepare;
     }
 
     /**
@@ -190,8 +299,7 @@ public class Paxos implements PaxosRMI, Runnable {
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq) {
-        // Your code here
-        return null;
+        return new retStatus(state, value);
     }
 
     /**
