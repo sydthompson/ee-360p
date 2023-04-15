@@ -14,9 +14,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public class Paxos implements PaxosRMI, Runnable {
 
     ReentrantLock mutex;
-    String[] peers; // hostnames of all peers
-    int[] ports; // ports of all peers
-    int me; // this peer's index into peers[] and ports[]
+    String[] peers;             // hostnames of all peers
+    int[] ports;                // ports of all peers
+    int me;                     // this peer's index into peers[] and ports[]
 
     Registry registry;
     PaxosRMI stub;
@@ -159,9 +159,7 @@ public class Paxos implements PaxosRMI, Runnable {
         // Your code here
         Paxos newPaxos = new Paxos(seq, peers, ports, value);
         instances.add(newPaxos);
-        newPaxos.run();
-
-        //TODO return without waiting for thread to finish
+        return new Thread(newPaxos).start();
     }
 
     @Override
