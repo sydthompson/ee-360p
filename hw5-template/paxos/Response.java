@@ -9,7 +9,19 @@ import java.io.Serializable;
  */
 public class Response implements Serializable {
     static final long serialVersionUID = 2L;
-    // Your data here
 
-    // Your constructor and methods here
+    public MessageType type;
+    public int n_proposal;
+    public int n_accept;
+    public int n_done;                      // Highest value i passed to done that is known by the process
+    public Object value;
+
+    public Response (MessageType type, int n_proposal, int n_accept, int n_done, Object value) {
+        this.type = type;
+        this.n_proposal = n_proposal;
+        this.n_accept = n_accept;
+        this.n_done = n_done;
+        this.value = value;
+    }
+    
 }

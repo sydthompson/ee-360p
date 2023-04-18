@@ -10,21 +10,14 @@ import java.io.Serializable;
  */
 public class Request implements Serializable {
     static final long serialVersionUID = 1L;
-    // Your data here
-    public String type;
-    public int seqNumber;
-    public double proposalNumber;
-    public Object value;
-    // Your constructor and methods here
 
-    public Request(String type, 
-                    int seqNumber, 
-                    Object value, 
-                    double proposalNumber) {
-                        
-        this.type=type;
-        this.seqNumber=seqNumber;
-        this.proposalNumber=proposalNumber;
-        this.value=value;
+    public int n_done;                      // Highest value i passed to done that is known by the process
+    public int n_proposal;
+    public Object value;
+
+    public Request (int n_done, int n_proposal, Object value) {
+        this.n_done = n_done;
+        this.n_proposal = n_proposal;
+        this.value = value;
     }
 }

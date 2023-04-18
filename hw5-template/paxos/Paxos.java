@@ -20,27 +20,24 @@ public class Paxos implements PaxosRMI, Runnable {
 
     Registry registry;
     PaxosRMI stub;
+    
+    // Broadcast to peers once true
+    boolean decided = false;
+    
+    // Used by a process to generate unique proposal numbers when proposing values
+    int n_seq;
 
-    //proposer
-    int seq;
-    Object value;
-
-    //acceptor
-    int highest_prepare;
-    int highest_accept;
-    Object highest_accept_value;
-    boolean hasDecided = false;
+    // n represents a proposal number
+    int n_prepare_highest,
+        n_accept_highest,
+        n_done_highest;
+    // v corresponds to the value to be proposed by this paxos instance
+    Object v;
 
     State state;
-    int min;
-    double proposalNumber;
-
-    AtomicBoolean dead; // for testing
-    AtomicBoolean unreliable; // for testing
-
-    // Your data here
-    ArrayList<Paxos> instances;
-
+    AtomicBoolean dead,
+                  unreliable;   // for testing
+    
     /**
      * Call the constructor to create a Paxos peer.
      * The hostnames of all the Paxos peers (including this one)
@@ -55,13 +52,10 @@ public class Paxos implements PaxosRMI, Runnable {
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
 
-        // Your initialization code here
-        instances = new ArrayList<>();
-        seq = highest_prepare = min = -1;
+        n_seq = n_prepare_highest 0;
         state = State.Pending;
-        highest_accept_value=0;
 
-        proposalNumber = (Thread.currentThread().getId())/1000;
+        n_proposal = (Thread.currentThread().getId())/1000;
 
         // register peers, do not modify this part
         try {
@@ -75,33 +69,8 @@ public class Paxos implements PaxosRMI, Runnable {
     }
 
     public Paxos(int me, String[] peers, int[] ports, Object value) {
-
-        this.me = me;
-        this.peers = peers;
-        this.ports = ports;
-        this.mutex = new ReentrantLock();
-        this.dead = new AtomicBoolean(false);
-        this.unreliable = new AtomicBoolean(false);
-        this.value=value;
-
-        // Your initialization code here
-        instances = new ArrayList<>();
-        seq = highest_prepare = min = -1;
-        state = State.Pending;
-        highest_accept_value=0;
-
-        proposalNumber = (Thread.currentThread().getId())/1000;
-
-
-        // register peers, do not modify this part
-        try {
-            System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
-            registry = LocateRegistry.createRegistry(this.ports[this.me]);
-            stub = (PaxosRMI) UnicastRemoteObject.exportObject(this, this.ports[this.me]);
-            registry.rebind("Paxos", stub);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        this(me, peers, ports);
+        this.value = value;
     }
 
     /**
@@ -156,77 +125,141 @@ public class Paxos implements PaxosRMI, Runnable {
      * is reached.
      */
     public void Start(int seq, Object value) {
-        // Your code here
+        // Start the PAXOS instance, add it within the static var for instances
         Paxos newPaxos = new Paxos(seq, peers, ports, value);
-        instances.add(newPaxos);
         return new Thread(newPaxos).start();
     }
-
+    
+    /*
+     * PROPOSER
+     */
     @Override
     public void run() {
-        //should send out requests with seqNum with Object value 
+        while (!decided) {
+            // For process i of N, n_send_propose = i + (sequence * N)
+            // Increase number
+            int n_send_propose = me + (n_seq * peers.length);
+            n_seq++;
+
+            int num_prepare = 0, 
+                num_accept = 0;
+            
+            Request request = new Request(
+                    n_send_propose, 
+                    n_done_highest, 
+                    v);
+
+            // Send to all instances, check if receive ok from more than half of array length
+            for (int i = 0; i < peers.length; i++) {
+
+                // Send prepare via RMI and look for OK response
+                Response r_prepare = Call("Prepare", request, me);
+                if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
+                else (r_prepare.type == MessageType.PREPARE_REJECT) {
+                    // Rejected message, so adjust the highest proposed n seen
+                    n_prepare_highest = r_prepare.n_proposal;
+                }
+                // Now check if n done needs to be replaced
+                if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
+            }
+
+            // Accept request in case n and v have changed
+            Request a_request = new Request(
+                    n_send_propose, 
+                    n_done_highest, 
+                    v);
+
+            // Check for majority OK, then move to accept
+            if (num_prepare > Integer.valueOf(peers.length / 2)) {
+                for (int i = 0; i < peers.length; i++) {
+                    Response r_accept = Call("Accept", a_request, me);
+
+                    if (r_accept.type == MessageType.ACCEPT_OK) num_accept++;
+                    else (r_accept.type == MessageType.ACCEPT_REJECT) {
+                        // Rejected message, so adjust the highest accepted n seen
+                        n_accept_highest = r_accept.n_accept;
+                    }
+                }
+                if (num_accept > Integer.valueOf(peers.length / 2)) {
+                    for (int i = 0; i < peers.length; i++) {
+                    // Decide request in case n and v have changed
+                    Request d_request = new Request(
+                            n_send_propose, 
+                            n_done_highest, 
+                            v);
+
+                    for (int i = 0; i < peers.length; i++) {
+                        Call("Decide", d_request, me);
+                    }
+                }
+            }
+        } 
     }
+
+    /*
+     * ACCEPTOR
+     */
 
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
 
-        if(req.seqNumber > highest_prepare) {
-            highest_prepare=req.seqNumber;
-            Request request = new Request("ok", 
-                    highest_accept, 
-                    highest_accept_value, 
-                    proposalNumber++);
-            return Call("Prepare", request, me);
+        Response r;
+
+        if (req.n_proposal > n_prepare_highest) {
+            // PREPARE OK
+            n_prepare_highest = req.n_proposal;
+            r = new Response(
+                MessageType.PREPARE_OK,
+                n_accept_highest, 
+                n_accept_highest_value, 
+                n_proposal);
+            return r;
+        } else {
+            // PREPARE REJECT
+            r = new Response(
+                MessageType.PREPARE_REJECT, 
+                n_accept_highest, 
+                n_accept_highest_value, 
+                req.n_proposal);
+            return r;
         }
-
-        Request request = new Request("reject", 
-                highest_accept, 
-                highest_accept_value, 
-                req.proposalNumber);
-
-        return Call("Prepare", request, me);
     }
 
     // RMI Handler for accept requests
     public Response Accept(Request req) {
 
-        if(req.seqNumber >= highest_prepare) {
-            highest_prepare=req.seqNumber;
-            highest_accept=req.seqNumber;
-            highest_accept_value=req.value;
-            Request request = new Request("ok", 
-                req.seqNumber, 
-                req.value, 
-                req.proposalNumber);
-            return Call("Accept", request, me);
-        }
+        Response r;
 
-        Request request = new Request("reject",
-                highest_accept,
-                highest_accept_value,
-                req.proposalNumber);
-        return Call("Accept", request, me);
+        if (req.n_proposal >= n_prepare_highest) {
+            n_prepare_highest = req.n_proposal;         // n_p = n
+            n_accept_highest = req.n_proposal;          // n_a = n
+            n_accept_highest_value = req.value;         // v_a = v
+            
+            // ACCEPT OK
+            r = new Response(
+                MessageType.ACCEPT_OK, 
+                n_prepare_highest, 
+                n_accept_highest, 
+                n_accept_highest_value);
+            return r;
+        } else {
+            // ACCEPT REJECT
+            r = new Request(
+                MessageType.ACCEPT_REJECT,
+                n_accept_highest,
+                n_accept_highest_value,
+                req.n_proposal);
+            return r;
+        }
     }
+
+    /*
+     * WHEN DECISION REACHED
+     */
 
     // RMI Handler for decide requests
     public Response Decide(Request req) {
-        if(!hasDecided) {
-            highest_accept=req.seqNumber;
-            highest_prepare=req.seqNumber;
-            highest_accept_value=req.value;
-
-            Request request = new Request("ok", 
-                req.seqNumber, 
-                req.value, 
-                req.proposalNumber);
-            return Call("Decide", request, me);
-        } 
-
-        Request request = new Request("reject", 
-                req.seqNumber, 
-                req.value, 
-                req.proposalNumber);
-            return Call("Decide", request, me);
+        // TODO
     }
 
     /**
@@ -252,8 +285,8 @@ public class Paxos implements PaxosRMI, Runnable {
      * this peer.
      */
     public int Max() {
-        // Your code here
-        return highest_prepare;
+        // TODO
+        return n_prepare_highest;
     }
 
     /**
@@ -285,7 +318,7 @@ public class Paxos implements PaxosRMI, Runnable {
      * instances.
      */
     public int Min() {
-        // Your code here
+        //TODO: Check local done state
         return -1;
     }
 
