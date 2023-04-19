@@ -30,9 +30,11 @@ public class Paxos implements PaxosRMI, Runnable {
     // n represents a proposal number
     int n_prepare_highest,
         n_accept_highest,
-        n_done_highest;
+        n_done_highest,
+        n_proposal;
     // v corresponds to the value to be proposed by this paxos instance
     Object v;
+    Object n_accept_highest_value;
 
     State state;
     AtomicBoolean dead,
@@ -52,10 +54,9 @@ public class Paxos implements PaxosRMI, Runnable {
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
 
-        n_seq = n_prepare_highest 0;
+        n_seq = n_prepare_highest = n_proposal = 0;
         state = State.Pending;
 
-        n_proposal = (Thread.currentThread().getId())/1000;
 
         // register peers, do not modify this part
         try {
@@ -70,7 +71,7 @@ public class Paxos implements PaxosRMI, Runnable {
 
     public Paxos(int me, String[] peers, int[] ports, Object value) {
         this(me, peers, ports);
-        this.value = value;
+        this.v = value;
     }
 
     /**
@@ -127,7 +128,7 @@ public class Paxos implements PaxosRMI, Runnable {
     public void Start(int seq, Object value) {
         // Start the PAXOS instance, add it within the static var for instances
         Paxos newPaxos = new Paxos(seq, peers, ports, value);
-        return new Thread(newPaxos).start();
+        new Thread(newPaxos).start();
     }
     
     /*
@@ -155,7 +156,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 // Send prepare via RMI and look for OK response
                 Response r_prepare = Call("Prepare", request, me);
                 if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
-                else (r_prepare.type == MessageType.PREPARE_REJECT) {
+                else if(r_prepare.type == MessageType.PREPARE_REJECT) {
                     // Rejected message, so adjust the highest proposed n seen
                     n_prepare_highest = r_prepare.n_proposal;
                 }
@@ -175,7 +176,7 @@ public class Paxos implements PaxosRMI, Runnable {
                     Response r_accept = Call("Accept", a_request, me);
 
                     if (r_accept.type == MessageType.ACCEPT_OK) num_accept++;
-                    else (r_accept.type == MessageType.ACCEPT_REJECT) {
+                    else if (r_accept.type == MessageType.ACCEPT_REJECT) {
                         // Rejected message, so adjust the highest accepted n seen
                         n_accept_highest = r_accept.n_accept;
                     }
@@ -188,12 +189,13 @@ public class Paxos implements PaxosRMI, Runnable {
                             n_done_highest, 
                             v);
 
-                    for (int i = 0; i < peers.length; i++) {
+                    for (int j = 0; j < peers.length; j++) {
                         Call("Decide", d_request, me);
                     }
                 }
             }
         } 
+        }
     }
 
     /*
@@ -210,17 +212,19 @@ public class Paxos implements PaxosRMI, Runnable {
             n_prepare_highest = req.n_proposal;
             r = new Response(
                 MessageType.PREPARE_OK,
+                req.n_proposal,
                 n_accept_highest, 
-                n_accept_highest_value, 
-                n_proposal);
+                n_done_highest,
+                n_accept_highest_value);
             return r;
         } else {
             // PREPARE REJECT
             r = new Response(
                 MessageType.PREPARE_REJECT, 
+                req.n_proposal,
                 n_accept_highest, 
-                n_accept_highest_value, 
-                req.n_proposal);
+                n_done_highest,
+                n_accept_highest_value);
             return r;
         }
     }
@@ -238,17 +242,19 @@ public class Paxos implements PaxosRMI, Runnable {
             // ACCEPT OK
             r = new Response(
                 MessageType.ACCEPT_OK, 
-                n_prepare_highest, 
+                req.n_proposal,
                 n_accept_highest, 
+                n_done_highest,
                 n_accept_highest_value);
             return r;
         } else {
             // ACCEPT REJECT
-            r = new Request(
+            r = new Response(
                 MessageType.ACCEPT_REJECT,
-                n_accept_highest,
-                n_accept_highest_value,
-                req.n_proposal);
+                req.n_proposal,
+                n_accept_highest, 
+                n_done_highest,
+                n_accept_highest_value);
             return r;
         }
     }
@@ -260,6 +266,7 @@ public class Paxos implements PaxosRMI, Runnable {
     // RMI Handler for decide requests
     public Response Decide(Request req) {
         // TODO
+        return null;
     }
 
     /**
@@ -270,11 +277,11 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public void Done(int seq) {
         // Your code here
-        for(Paxos current: instances) {
-            if(current.seq <= min) {
-                current.Kill();
-            }
-        }
+        // for(Paxos current: instances) {
+        //     if(current.seq <= min) {
+        //         current.Kill();
+        //     }
+        // }
 
         //TODO send the highest Done argument supplied by local application
     }
@@ -330,7 +337,7 @@ public class Paxos implements PaxosRMI, Runnable {
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq) {
-        return new retStatus(state, value);
+        return new retStatus(state, v);
     }
 
     /**
