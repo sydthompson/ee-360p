@@ -3,8 +3,8 @@ package paxos;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
-import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -12,6 +12,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * It corresponds to a single Paxos peer.
  */
 public class Paxos implements PaxosRMI, Runnable {
+
+    static AtomicInteger global_proposal_number = new AtomicInteger(0);
 
     ReentrantLock mutex;
     String[] peers;             // hostnames of all peers
@@ -139,8 +141,7 @@ public class Paxos implements PaxosRMI, Runnable {
         while (!decided) {
             // For process i of N, n_send_propose = i + (sequence * N)
             // Increase number
-            int n_send_propose = me + (n_seq * peers.length);
-            n_seq++;
+            int n_send_propose = global_proposal_number.incrementAndGet();
 
             int num_prepare = 0, 
                 num_accept = 0;
