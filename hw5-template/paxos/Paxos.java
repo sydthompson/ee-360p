@@ -156,26 +156,30 @@ public class Paxos implements PaxosRMI, Runnable {
                 Response r_prepare = Call("Prepare", request, i);
                 // System.out.println(String.format("My clock (P%d): %d, Peer response (P%d): %s",
                 // me, highest_n, i, r_prepare.toString()));
-                if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
-
-                // Now check if n done needs to be replaced
-                if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
+                
+                if (r_prepare != null){
+                    if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
+                    // Now check if n done needs to be replaced
+                    //if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
+                } 
             }
-
-            // Accept request in case n and v have changed
-            Request a_request = new Request(
-                    seq,
-                    highest_n, 
-                    n_done_highest, 
-                    value);
 
             // Check for majority OK, then move to accept
             if (num_prepare > Integer.valueOf(peers.length / 2)) {
+                // Accept request in case n and v have changed
+                Request a_request = new Request(
+                        seq,
+                        highest_n, 
+                        n_done_highest, 
+                        value);
+
                 for (int i = 0; i < peers.length; i++) {
                     Response r_accept = Call("Accept", a_request, i);
                     // System.out.println(String.format("My clock (P%d): %d, Peer response (P%d): %s",
                     // me, highest_n, i, r_accept.toString()));
-                    if (r_accept.type == MessageType.ACCEPT_OK) num_accept++;
+                    if (r_accept != null) {
+                        if (r_accept.type == MessageType.ACCEPT_OK) num_accept++;
+                    }
                 }
 
                 // Majority OK, move to decide
@@ -203,7 +207,7 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
-        //if (req.seq != seq) return Resp;
+        if (req.seq != seq) return null;
 
         Response r;
         if (req.n_clock > n_prepare_highest) {
@@ -230,7 +234,7 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for accept requests
     public Response Accept(Request req) {
-        //if (req.seq != seq) return;
+        if (req.seq != seq) return null;
 
         Response r;
 
