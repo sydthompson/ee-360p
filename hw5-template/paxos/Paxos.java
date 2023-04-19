@@ -141,6 +141,9 @@ public class Paxos implements PaxosRMI, Runnable {
     public void run() {
         n_clock = (seq + 1) * peers.length;
         while (state != State.Decided && state != State.Forgotten) {
+
+            if(isDead()) return;
+            
             n_clock += (me + 1);
             int highest_n = n_clock;
 
@@ -352,7 +355,7 @@ public class Paxos implements PaxosRMI, Runnable {
         // if status() seq < Min(), return forgotten
         if(seq < Min()) return new retStatus(State.Forgotten, value);
 
-        
+
         return new retStatus(state, value);
     }
 
