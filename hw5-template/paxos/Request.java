@@ -11,11 +11,13 @@ import java.io.Serializable;
 public class Request implements Serializable {
     static final long serialVersionUID = 1L;
 
+    public int seq;
     public int n_done;                      // Highest value i passed to done that is known by the process
     public int n_clock;
     public Object value;
 
-    public Request (int n_clock, int n_done, Object value) {
+    public Request (int seq, int n_clock, int n_done, Object value) {
+        this.seq = seq;
         this.n_clock = n_clock;
         this.n_done = n_done;
         this.value = value;
