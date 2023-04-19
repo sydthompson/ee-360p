@@ -12,12 +12,12 @@ public class Request implements Serializable {
     static final long serialVersionUID = 1L;
 
     public int n_done;                      // Highest value i passed to done that is known by the process
-    public int n_proposal;
+    public int n_clock;
     public Object value;
 
-    public Request (int n_done, int n_proposal, Object value) {
+    public Request (int n_clock, int n_done, Object value) {
+        this.n_clock = n_clock;
         this.n_done = n_done;
-        this.n_proposal = n_proposal;
         this.value = value;
     }
 }

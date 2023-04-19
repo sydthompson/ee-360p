@@ -6,14 +6,13 @@ import java.rmi.registry.Registry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.HashMap;
 
 /**
  * This class is the main class you need to implement paxos instances.
  * It corresponds to a single Paxos peer.
  */
 public class Paxos implements PaxosRMI, Runnable {
-
-    static AtomicInteger global_proposal_number = new AtomicInteger(0);
 
     ReentrantLock mutex;
     String[] peers;             // hostnames of all peers
@@ -27,39 +26,39 @@ public class Paxos implements PaxosRMI, Runnable {
     boolean decided = false;
     
     // Used by a process to generate unique proposal numbers when proposing values
-    int n_seq;
 
-    // n represents a proposal number
-    int n_prepare_highest,
+    // n represents a proposal timestamp
+    int n_clock,
+        n_prepare_highest,
         n_accept_highest,
-        n_done_highest,
-        n_proposal;
+        n_done_highest;
+
     // v corresponds to the value to be proposed by this paxos instance
-    Object v;
+    int seq;
+    Object value;
     Object n_accept_highest_value;
 
     State state;
     AtomicBoolean dead,
                   unreliable;   // for testing
     
+    static HashMap<Integer, Object> v_decided = new HashMap<Integer, Object>();
     /**
      * Call the constructor to create a Paxos peer.
      * The hostnames of all the Paxos peers (including this one)
      * are in peers[]. The ports are in ports[].
      */
     public Paxos(int me, String[] peers, int[] ports) {
-
         this.me = me;
         this.peers = peers;
         this.ports = ports;
+
         this.mutex = new ReentrantLock();
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
 
-        n_seq = n_prepare_highest = n_proposal = 0;
+        n_clock = n_accept_highest = n_prepare_highest = n_done_highest = 0;
         state = State.Pending;
-
-
         // register peers, do not modify this part
         try {
             System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
@@ -69,11 +68,6 @@ public class Paxos implements PaxosRMI, Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public Paxos(int me, String[] peers, int[] ports, Object value) {
-        this(me, peers, ports);
-        this.v = value;
     }
 
     /**
@@ -129,8 +123,10 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public void Start(int seq, Object value) {
         // Start the PAXOS instance, add it within the static var for instances
-        Paxos newPaxos = new Paxos(seq, peers, ports, value);
-        new Thread(newPaxos).start();
+        this.seq = seq;
+        this.value = value;
+        new Thread(this).start();
+        System.out.println("Thread started");
     }
     
     /*
@@ -139,27 +135,28 @@ public class Paxos implements PaxosRMI, Runnable {
     @Override
     public void run() {
         while (!decided) {
-            // For process i of N, n_send_propose = i + (sequence * N)
-            // Increase number
-            int n_send_propose = global_proposal_number.incrementAndGet();
+            n_clock += (me + 1);
+            int highest_n = n_clock;
 
             int num_prepare = 0, 
                 num_accept = 0;
-            
-            Request request = new Request(
-                    n_send_propose, 
-                    n_done_highest, 
-                    v);
 
+            System.out.println(highest_n);
+            Request request = new Request(
+                    highest_n, 
+                    n_done_highest, 
+                    value);
+            // TODO = USE LOCAL ACCEPTOR WHEN IT'S YOUR ID
             // Send to all instances, check if receive ok from more than half of array length
             for (int i = 0; i < peers.length; i++) {
 
                 // Send prepare via RMI and look for OK response
-                Response r_prepare = Call("Prepare", request, me);
+                Response r_prepare = Call("Prepare", request, i);
+                System.out.println(r_prepare.toString());
                 if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
                 else if(r_prepare.type == MessageType.PREPARE_REJECT) {
-                    // Rejected message, so adjust the highest proposed n seen
-                    n_prepare_highest = r_prepare.n_proposal;
+                    // Rejected message, so adjust the logical clock
+                    //n_clock = r_accept.n_clock
                 }
                 // Now check if n done needs to be replaced
                 if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
@@ -167,36 +164,35 @@ public class Paxos implements PaxosRMI, Runnable {
 
             // Accept request in case n and v have changed
             Request a_request = new Request(
-                    n_send_propose, 
+                    highest_n, 
                     n_done_highest, 
-                    v);
+                    value);
 
             // Check for majority OK, then move to accept
             if (num_prepare > Integer.valueOf(peers.length / 2)) {
                 for (int i = 0; i < peers.length; i++) {
-                    Response r_accept = Call("Accept", a_request, me);
+                    Response r_accept = Call("Accept", a_request, i);
 
                     if (r_accept.type == MessageType.ACCEPT_OK) num_accept++;
-                    else if (r_accept.type == MessageType.ACCEPT_REJECT) {
-                        // Rejected message, so adjust the highest accepted n seen
-                        n_accept_highest = r_accept.n_accept;
+                    else if (r_accept.type == MessageType.ACCEPT_REJECT);
+                        //n_clock = r_accept.n_clock
                     }
                 }
+                // Majority OK, move to decide
                 if (num_accept > Integer.valueOf(peers.length / 2)) {
                     for (int i = 0; i < peers.length; i++) {
                     // Decide request in case n and v have changed
-                    Request d_request = new Request(
-                            n_send_propose, 
-                            n_done_highest, 
-                            v);
+                        Request d_request = new Request(
+                                highest_n,
+                                n_done_highest, 
+                                value);
 
-                    for (int j = 0; j < peers.length; j++) {
-                        Call("Decide", d_request, me);
+                        for (int j = 0; j < peers.length; j++) {
+                            Call("Decide", d_request, i);
+                        }
                     }
                 }
-            }
-        } 
-        }
+            } 
     }
 
     /*
@@ -205,15 +201,14 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
-
         Response r;
-
-        if (req.n_proposal > n_prepare_highest) {
+        System.out.println(String.format("%d My clock: %d, their clock: %d", me, n_prepare_highest, req.n_clock));
+        if (req.n_clock > n_prepare_highest) {
             // PREPARE OK
-            n_prepare_highest = req.n_proposal;
+            n_prepare_highest = req.n_clock;
             r = new Response(
                 MessageType.PREPARE_OK,
-                req.n_proposal,
+                n_clock,
                 n_accept_highest, 
                 n_done_highest,
                 n_accept_highest_value);
@@ -222,7 +217,7 @@ public class Paxos implements PaxosRMI, Runnable {
             // PREPARE REJECT
             r = new Response(
                 MessageType.PREPARE_REJECT, 
-                req.n_proposal,
+                n_clock,
                 n_accept_highest, 
                 n_done_highest,
                 n_accept_highest_value);
@@ -235,15 +230,15 @@ public class Paxos implements PaxosRMI, Runnable {
 
         Response r;
 
-        if (req.n_proposal >= n_prepare_highest) {
-            n_prepare_highest = req.n_proposal;         // n_p = n
-            n_accept_highest = req.n_proposal;          // n_a = n
+        if (req.n_clock >= n_prepare_highest) {
+            n_prepare_highest = req.n_clock;         // n_p = n
+            n_accept_highest = req.n_clock;          // n_a = n
             n_accept_highest_value = req.value;         // v_a = v
             
             // ACCEPT OK
             r = new Response(
                 MessageType.ACCEPT_OK, 
-                req.n_proposal,
+                n_clock,
                 n_accept_highest, 
                 n_done_highest,
                 n_accept_highest_value);
@@ -252,7 +247,7 @@ public class Paxos implements PaxosRMI, Runnable {
             // ACCEPT REJECT
             r = new Response(
                 MessageType.ACCEPT_REJECT,
-                req.n_proposal,
+                n_clock,
                 n_accept_highest, 
                 n_done_highest,
                 n_accept_highest_value);
@@ -267,7 +262,15 @@ public class Paxos implements PaxosRMI, Runnable {
     // RMI Handler for decide requests
     public Response Decide(Request req) {
         // TODO
-        return null;
+        this.state = State.Decided;
+        this.value= req.value;
+        return new Response(
+            MessageType.DECIDE_OK,
+            n_clock,
+            n_accept_highest, 
+            n_done_highest,
+            n_accept_highest_value
+        );
     }
 
     /**
@@ -338,7 +341,7 @@ public class Paxos implements PaxosRMI, Runnable {
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq) {
-        return new retStatus(state, v);
+        return new retStatus(state, value);
     }
 
     /**
@@ -346,11 +349,11 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public class retStatus {
         public State state;
-        public Object v;
+        public Object value;
 
-        public retStatus(State state, Object v) {
+        public retStatus(State state, Object value) {
             this.state = state;
-            this.v = v;
+            this.value = value;
         }
     }
 
