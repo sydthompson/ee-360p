@@ -3,8 +3,8 @@ package paxos;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.HashMap;
 
@@ -42,7 +42,7 @@ public class Paxos implements PaxosRMI, Runnable {
     AtomicBoolean dead,
                   unreliable;   // for testing
     
-    static HashMap<Integer, Object> v_decided = new HashMap<Integer, Object>();
+    static ConcurrentHashMap<Integer, Object> v_decided = new ConcurrentHashMap<Integer, Object>();
     /**
      * Call the constructor to create a Paxos peer.
      * The hostnames of all the Paxos peers (including this one)
@@ -66,7 +66,7 @@ public class Paxos implements PaxosRMI, Runnable {
             stub = (PaxosRMI) UnicastRemoteObject.exportObject(this, this.ports[this.me]);
             registry.rebind("Paxos", stub);
         } catch (Exception e) {
-            //e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
@@ -123,6 +123,10 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public void Start(int seq, Object value) {
         // Start the PAXOS instance, add it within the static var for instances
+
+        //ignore Start() call if seq is less than min
+        if(seq < Min()) return;
+
         Paxos newPaxos = new Paxos(me, peers, ports);
         newPaxos.seq = seq;
         newPaxos.value = value;
@@ -136,7 +140,7 @@ public class Paxos implements PaxosRMI, Runnable {
     @Override
     public void run() {
         n_clock = (seq + 1) * peers.length;
-        while (state != state.Decided) {
+        while (state != State.Decided && state != State.Forgotten) {
             n_clock += (me + 1);
             int highest_n = n_clock;
 
@@ -160,7 +164,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 if (r_prepare != null){
                     if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
                     // Now check if n done needs to be replaced
-                    //if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
+                    if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
                 } 
             }
 
@@ -269,7 +273,6 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for decide requests
     public Response Decide(Request req) {
-        // TODO
         this.state = State.Decided;
         this.value = req.value;
         return new Response(
@@ -288,12 +291,8 @@ public class Paxos implements PaxosRMI, Runnable {
      * see the comments for Min() for more explanation.
      */
     public void Done(int seq) {
-        // Your code here
-        // for(Paxos current: instances) {
-        //     if(current.seq <= min) {
-        //         current.Kill();
-        //     }
-        // }
+        
+        // find out which 
 
         //TODO send the highest Done argument supplied by local application
     }
@@ -304,7 +303,6 @@ public class Paxos implements PaxosRMI, Runnable {
      * this peer.
      */
     public int Max() {
-        // TODO
         return n_prepare_highest;
     }
 
@@ -338,6 +336,7 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     public int Min() {
         //TODO: Check local done state
+        
         return -1;
     }
 
@@ -349,6 +348,11 @@ public class Paxos implements PaxosRMI, Runnable {
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq) {
+
+        // if status() seq < Min(), return forgotten
+        if(seq < Min()) return new retStatus(State.Forgotten, value);
+
+        
         return new retStatus(state, value);
     }
 
