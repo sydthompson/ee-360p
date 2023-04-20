@@ -224,6 +224,14 @@ public class Paxos implements PaxosRMI, Runnable {
         }
     }
 
+    private void updateDoneLowest(Request req) {
+        for(int a=0; a < n_done_lowest.length; a++) {
+            if(n_done_lowest[a] < req.n_done_lowest[a]) {
+                n_done_lowest[a] = req.n_done_lowest[a];
+            }
+        } 
+    }
+
     /*
      * ACCEPTOR
      */
@@ -231,11 +239,9 @@ public class Paxos implements PaxosRMI, Runnable {
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
         if (req.seq != seq) return null;
-        for(int a=0; a < n_done_lowest.length; a++) {
-            if(n_done_lowest[a] < req.n_done_lowest[a]) {
-                n_done_lowest[a] = req.n_done_lowest[a];
-            }
-        } 
+
+        updateDoneLowest(req);
+
         Response r;
         if (req.n_clock > n_prepare_highest) {
             // PREPARE OK
@@ -264,11 +270,9 @@ public class Paxos implements PaxosRMI, Runnable {
     // RMI Handler for accept requests
     public Response Accept(Request req) {
         if (req.seq != seq) return null;
-        for(int a=0; a < n_done_lowest.length; a++) {
-            if(n_done_lowest[a] < req.n_done_lowest[a]) {
-                n_done_lowest[a] = req.n_done_lowest[a];
-            }
-        } 
+        
+        updateDoneLowest(req);
+ 
         Response r;
 
         if (req.n_clock >= n_prepare_highest) {
@@ -304,11 +308,8 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for decide requests
     public Response Decide(Request req) {
-        for(int a=0; a < n_done_lowest.length; a++) {
-            if(n_done_lowest[a] < req.n_done_lowest[a]) {
-                n_done_lowest[a] = req.n_done_lowest[a];
-            }
-        } 
+        updateDoneLowest(req);
+
         this.state = State.Decided;
         this.value = req.value;
         return new Response(
