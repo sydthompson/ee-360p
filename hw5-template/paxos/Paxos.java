@@ -6,7 +6,6 @@ import java.rmi.registry.Registry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.HashMap;
 
 /**
  * This class is the main class you need to implement paxos instances.
@@ -158,7 +157,7 @@ public class Paxos implements PaxosRMI, Runnable {
             Request request = new Request(
                     seq,
                     highest_n, 
-                    n_done_lowest[me],
+                    n_done_lowest,
                     n_done_highest, 
                     value);
 
@@ -174,7 +173,13 @@ public class Paxos implements PaxosRMI, Runnable {
                     if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
                     // Now check if n done needs to be replaced
                     if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
-                    n_done_lowest[i] = r_prepare.n_done_lowest;
+                    // System.out.println("receiving new done lowest vals: " + help(r_prepare.n_done_lowest));
+                    // System.out.println("before: " + help(n_done_lowest));
+                    for(int a=0; a < n_done_lowest.length; a++) {
+                        if(n_done_lowest[a] < r_prepare.n_done_lowest[a]) {
+                            n_done_lowest[a] = r_prepare.n_done_lowest[a];
+                        }
+                     } //System.out.println("after: " + help(n_done_lowest));
                 } 
             }
 
@@ -184,7 +189,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 Request a_request = new Request(
                         seq,
                         highest_n, 
-                        n_done_lowest[me],
+                        n_done_lowest,
                         n_done_highest, 
                         value);
 
@@ -205,7 +210,7 @@ public class Paxos implements PaxosRMI, Runnable {
                         Request d_request = new Request(
                                 seq,
                                 highest_n,
-                                n_done_lowest[me],
+                                n_done_lowest,
                                 n_done_highest, 
                                 value);
                         for (int j = 0; j < peers.length; j++) {
@@ -226,7 +231,11 @@ public class Paxos implements PaxosRMI, Runnable {
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
         if (req.seq != seq) return null;
-
+        for(int a=0; a < n_done_lowest.length; a++) {
+            if(n_done_lowest[a] < req.n_done_lowest[a]) {
+                n_done_lowest[a] = req.n_done_lowest[a];
+            }
+        } 
         Response r;
         if (req.n_clock > n_prepare_highest) {
             // PREPARE OK
@@ -235,7 +244,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.PREPARE_OK,
                 n_clock,
                 n_accept_highest, 
-                n_done_lowest[me],
+                n_done_lowest,
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -245,7 +254,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.PREPARE_REJECT, 
                 n_clock,
                 n_accept_highest, 
-                n_done_lowest[me],
+                n_done_lowest,
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -255,7 +264,11 @@ public class Paxos implements PaxosRMI, Runnable {
     // RMI Handler for accept requests
     public Response Accept(Request req) {
         if (req.seq != seq) return null;
-
+        for(int a=0; a < n_done_lowest.length; a++) {
+            if(n_done_lowest[a] < req.n_done_lowest[a]) {
+                n_done_lowest[a] = req.n_done_lowest[a];
+            }
+        } 
         Response r;
 
         if (req.n_clock >= n_prepare_highest) {
@@ -268,7 +281,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.ACCEPT_OK, 
                 n_clock,
                 n_accept_highest, 
-                n_done_lowest[me],
+                n_done_lowest,
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -278,7 +291,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.ACCEPT_REJECT,
                 n_clock,
                 n_accept_highest, 
-                n_done_lowest[me],
+                n_done_lowest,
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -291,13 +304,18 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for decide requests
     public Response Decide(Request req) {
+        for(int a=0; a < n_done_lowest.length; a++) {
+            if(n_done_lowest[a] < req.n_done_lowest[a]) {
+                n_done_lowest[a] = req.n_done_lowest[a];
+            }
+        } 
         this.state = State.Decided;
         this.value = req.value;
         return new Response(
             MessageType.DECIDE_OK,
             n_clock,
             n_accept_highest, 
-            n_done_lowest[me],
+            n_done_lowest,
             n_done_highest,
             n_accept_highest_value
         );
@@ -310,11 +328,22 @@ public class Paxos implements PaxosRMI, Runnable {
      * see the comments for Min() for more explanation.
      */
     public void Done(int seq) {
-        n_done_lowest[me]=seq;
+        // System.out.println("Entering Done w seq: " + seq);
+        // System.out.println("original state: " + help(n_done_lowest));
         int min_sequence = Min();
+        n_done_lowest[me]=seq;
         // find out which 
         if(this.seq < min_sequence) this.state = State.Forgotten;
         //TODO send the highest Done argument supplied by local application
+        // System.out.println("After done: " + help(n_done_lowest));
+    }
+
+    private String help(int[] arr) {
+        String s = "[";
+        for(int i : arr) {s += i + ", ";}
+        s= s.substring(0, s.length() - 2);
+        s+= "]";
+        return s;
     }
 
     /**

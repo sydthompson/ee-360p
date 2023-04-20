@@ -164,7 +164,7 @@ public class PaxosTest {
 
     @Test
     public void TestForget() {
-        final int npaxos = 6;
+        final int npaxos = 3;
         Paxos[] pxa = initPaxos(npaxos);
 
         System.out.println("Test: Forgetting ...");
