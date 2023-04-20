@@ -41,7 +41,9 @@ public class Paxos implements PaxosRMI, Runnable {
     State state;
     AtomicBoolean dead,
                   unreliable;   // for testing
-    
+
+    int[] n_done_lowest;
+
     static ConcurrentHashMap<Integer, Object> v_decided = new ConcurrentHashMap<Integer, Object>();
     /**
      * Call the constructor to create a Paxos peer.
@@ -57,8 +59,11 @@ public class Paxos implements PaxosRMI, Runnable {
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
 
-        n_accept_highest = n_prepare_highest = n_done_highest = 0;
+        n_accept_highest = n_prepare_highest = n_done_highest = -1;
         state = State.Pending;
+
+        n_done_lowest = new int[peers.length];
+        for(int i =0; i < n_done_lowest.length; i++) { n_done_lowest[i]=-1; }
         // register peers, do not modify this part
         try {
             System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
@@ -66,7 +71,7 @@ public class Paxos implements PaxosRMI, Runnable {
             stub = (PaxosRMI) UnicastRemoteObject.exportObject(this, this.ports[this.me]);
             registry.rebind("Paxos", stub);
         } catch (Exception e) {
-            e.printStackTrace();
+           // e.printStackTrace();
         }
     }
 
@@ -143,7 +148,7 @@ public class Paxos implements PaxosRMI, Runnable {
         while (state != State.Decided && state != State.Forgotten) {
 
             if(isDead()) return;
-            
+
             n_clock += (me + 1);
             int highest_n = n_clock;
 
@@ -153,6 +158,7 @@ public class Paxos implements PaxosRMI, Runnable {
             Request request = new Request(
                     seq,
                     highest_n, 
+                    n_done_lowest[me],
                     n_done_highest, 
                     value);
 
@@ -168,6 +174,7 @@ public class Paxos implements PaxosRMI, Runnable {
                     if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
                     // Now check if n done needs to be replaced
                     if (r_prepare.n_done > n_done_highest) n_done_highest = r_prepare.n_done;
+                    n_done_lowest[i] = r_prepare.n_done_lowest;
                 } 
             }
 
@@ -177,6 +184,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 Request a_request = new Request(
                         seq,
                         highest_n, 
+                        n_done_lowest[me],
                         n_done_highest, 
                         value);
 
@@ -197,12 +205,15 @@ public class Paxos implements PaxosRMI, Runnable {
                         Request d_request = new Request(
                                 seq,
                                 highest_n,
+                                n_done_lowest[me],
                                 n_done_highest, 
                                 value);
                         for (int j = 0; j < peers.length; j++) {
                             Call("Decide", d_request, i);
                         }
                     }
+
+                    v_decided.put(seq, value);
                 }
             } 
         }
@@ -224,6 +235,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.PREPARE_OK,
                 n_clock,
                 n_accept_highest, 
+                n_done_lowest[me],
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -233,6 +245,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.PREPARE_REJECT, 
                 n_clock,
                 n_accept_highest, 
+                n_done_lowest[me],
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -255,6 +268,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.ACCEPT_OK, 
                 n_clock,
                 n_accept_highest, 
+                n_done_lowest[me],
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -264,6 +278,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 MessageType.ACCEPT_REJECT,
                 n_clock,
                 n_accept_highest, 
+                n_done_lowest[me],
                 n_done_highest,
                 n_accept_highest_value);
             return r;
@@ -282,6 +297,7 @@ public class Paxos implements PaxosRMI, Runnable {
             MessageType.DECIDE_OK,
             n_clock,
             n_accept_highest, 
+            n_done_lowest[me],
             n_done_highest,
             n_accept_highest_value
         );
@@ -294,9 +310,10 @@ public class Paxos implements PaxosRMI, Runnable {
      * see the comments for Min() for more explanation.
      */
     public void Done(int seq) {
-        
+        n_done_lowest[me]=seq;
+        int min_sequence = Min();
         // find out which 
-
+        if(this.seq < min_sequence) this.state = State.Forgotten;
         //TODO send the highest Done argument supplied by local application
     }
 
@@ -338,9 +355,9 @@ public class Paxos implements PaxosRMI, Runnable {
      * instances.
      */
     public int Min() {
-        //TODO: Check local done state
-        
-        return -1;
+        int min=n_done_lowest[0];
+        for(int i : n_done_lowest) { if(i < min) min = i;}
+        return min + 1;
     }
 
     /**
