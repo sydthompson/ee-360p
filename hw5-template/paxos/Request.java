@@ -12,16 +12,14 @@ public class Request implements Serializable {
     static final long serialVersionUID = 1L;
 
     public int seq;
-    public int[] n_done_lowest;
-    public int n_done;                      // Highest value i passed to done that is known by the process
     public int n_clock;
     public Object value;
+    public int[] n_done_lowest; //Can be just the peers value
 
-    public Request (int seq, int n_clock, int[] n_done_lowest, int n_done, Object value) {
+    public Request (int seq, int n_clock, Object value, int[] n_done_lowest) {
         this.seq = seq;
-        this.n_clock = n_clock;        
-        this.n_done_lowest = n_done_lowest;
-        this.n_done = n_done;
+        this.n_clock = n_clock;
         this.value = value;
+        this.n_done_lowest = n_done_lowest;
     }
 }

@@ -11,22 +11,18 @@ public class Response implements Serializable {
     static final long serialVersionUID = 2L;
 
     public MessageType type;
-    public int n_clock;
-    public int n_accept;
+    public int n_a;
+    public Object v_a;
     public int[] n_done_lowest;
-    public int n_done;                      // Highest value i passed to done that is known by the process
-    public Object value;
 
-    public Response (MessageType type, int n_clock, int n_accept, int[] n_done_lowest, int n_done, Object value) {
+    public Response (MessageType type, int n_a, Object v_a, int[] n_done_lowest) {
         this.type = type;
-        this.n_clock = n_clock;
-        this.n_accept = n_accept;
+        this.n_a = n_a;
+        this.v_a = v_a;
         this.n_done_lowest = n_done_lowest;
-        this.n_done = n_done;
-        this.value = value;
     }
     
     public String toString() {
-        return String.format("%s, %d", type.toString(), n_clock);
+        return String.format("%s, %d", type.toString(), n_a);
     }
 }
