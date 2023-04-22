@@ -117,7 +117,7 @@ public class Paxos implements PaxosRMI, Runnable {
         // Start the PAXOS instance, add it within the static var for instances
 
         //ignore Start() call if seq is less than min
-        if(seq < Min()) return;
+        //if(seq < Min()) return;
         try {
             semaphore.acquire();
         } catch(Exception e) {
@@ -137,6 +137,7 @@ public class Paxos implements PaxosRMI, Runnable {
         int n_clock = me;
         Object p_value = value;
         State p_state = State.Pending;
+
         int highest_n = -1;
         Object highest_v = null;
         semaphore.release();
@@ -172,7 +173,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 } 
             }
             if (seq == 0) System.out.println(String.format("Theirs: %d, %s, Mine: %d", highest_n, highest_v, n_clock));
-            
+
             // Check for majority OK, then move to accept
             if (num_prepare >= (peers.length + 1) / 2) {
                 //If highest_n != -1 (invalid) -> Someone sent me a value to commit to
@@ -197,7 +198,7 @@ public class Paxos implements PaxosRMI, Runnable {
 
                 // Majority OK, move to decide
                 if (num_accept >= (peers.length + 1)/ 2) {
-                    //System.out.println("We decided on: " + send_value.toString());
+                    p_state = State.Decided;
                     for (int i = 0; i < peers.length; i++) {
                     // Decide request in case n and v have changed
                         Request d_request = new Request(p_seq, n_clock, send_value, n_done_lowest);
@@ -206,6 +207,7 @@ public class Paxos implements PaxosRMI, Runnable {
                         // Do something with min done value here
                     }
                 }
+                //System.out.println(String.format("We decided on: %s", v_decided.get(p_seq).value));
             } 
         }
     }
@@ -222,43 +224,33 @@ public class Paxos implements PaxosRMI, Runnable {
      * ACCEPTOR
      */
 
-    private PeerState getState(int seq) {
-        PeerState ps = v_decided.get(seq);
-        if (ps == null) {
-            ps = new PeerState(
-                -1,
-                -1,
-                null,
-                null,
-                State.Pending
-            );
-            v_decided.put(seq, ps);
-        }
-        return ps;
-    }
-
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
 
-        PeerState ps = getState(req.seq);
+        if (v_decided.get(req.seq) == null) {
+            v_decided.put(
+                req.seq,
+                new PeerState(-1, -1, null, null, State.Pending)
+            );
+        }
 
         //updateDoneLowest(req);
 
         Response r;
-        if (req.n_clock > ps.n_p) {
+        if (req.n_clock > v_decided.get(req.seq).n_p) {
             // PREPARE OK
-            ps.n_p = req.n_clock;
+            v_decided.get(req.seq).n_p = req.n_clock;
             r = new Response(
                 MessageType.PREPARE_OK,
-                ps.n_a,
-                ps.v_a,
+                v_decided.get(req.seq).n_a,
+                v_decided.get(req.seq).v_a,
                 n_done_lowest);
         } else {
             // PREPARE REJECT
             r = new Response(
                 MessageType.PREPARE_REJECT, 
-                ps.n_a,
-                ps.v_a,
+                v_decided.get(req.seq).n_a,
+                v_decided.get(req.seq).v_a,
                 n_done_lowest);
         }
         return r;
@@ -266,28 +258,27 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for accept requests
     public Response Accept(Request req) {
-        PeerState ps = getState(req.seq);
         //updateDoneLowest(req);
  
         Response r;
 
-        if (req.n_clock >= ps.n_p) {
-            ps.n_p = req.n_clock;      // n_p = n
-            ps.n_a = req.n_clock;      // n_a = n
-            ps.v_a = req.value;        // v_a = v
+        if (req.n_clock >= v_decided.get(req.seq).n_p) {
+            v_decided.get(req.seq).n_p = req.n_clock;      // n_p = n
+            v_decided.get(req.seq).n_a = req.n_clock;      // n_a = n
+            v_decided.get(req.seq).v_a = req.value;        // v_a = v
             
             // ACCEPT OK
             r = new Response(
                 MessageType.ACCEPT_OK, 
-                ps.n_a,
-                ps.v_a,
+                v_decided.get(req.seq).n_a,
+                v_decided.get(req.seq).v_a,
                 n_done_lowest);
         } else {
             // ACCEPT REJECT
             r = new Response(
                 MessageType.ACCEPT_REJECT,
-                ps.n_a,
-                ps.v_a,
+                v_decided.get(req.seq).n_a,
+                v_decided.get(req.seq).v_a,
                 n_done_lowest);
         }
         return r;
@@ -299,17 +290,14 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for decide requests
     public Response Decide(Request req) {
-        PeerState ps = getState(seq);
         //updateDoneLowest(req);
-        ps.state = State.Decided;
-        ps.value = req.value;
-
-        v_decided.put(req.seq, ps);
+        v_decided.get(req.seq).state = State.Decided;
+        v_decided.get(req.seq).value = req.value;
 
         return new Response(
             MessageType.DECIDE_OK,
-            ps.n_a,
-            ps.value,
+            v_decided.get(req.seq).n_a,
+            v_decided.get(req.seq).value,
             n_done_lowest
         );
     }
@@ -328,8 +316,7 @@ public class Paxos implements PaxosRMI, Runnable {
         // find out which 
         if(this.seq < min_sequence) {
             PeerState ps = v_decided.get(seq);
-            ps.state = State.Forgotten;
-            v_decided.put(seq, ps);
+            v_decided.get(seq).state = State.Forgotten;
         }
         //TODO send the highest Done argument supplied by local application
         // System.out.println("After done: " + help(n_done_lowest));
@@ -396,17 +383,15 @@ public class Paxos implements PaxosRMI, Runnable {
     public retStatus Status(int seq) {
 
         // if status() seq < Min(), return forgotten
-        //if(seq < Min()) return new retStatus(State.Forgotten, ps.value);
+        //if(seq < Min()) return new retStatus(State.Forgotten, v_decided.get(seq).value);
 
         // for (int s: v_decided.keySet()) {
         //     PeerState p = getState(s);
         //     System.out.println("Sequence " + s + ": " +  p.value);
         // }
+        if (v_decided.get(seq) == null) return new retStatus(State.Pending, null);
 
-        PeerState ps = getState(seq);
-        if (ps == null) return new retStatus(State.Pending, null);
-
-        return new retStatus(ps.state, ps.value);
+        return new retStatus(v_decided.get(seq).state, v_decided.get(seq).value);
     }
 
     /**
