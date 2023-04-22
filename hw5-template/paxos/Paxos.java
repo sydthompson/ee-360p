@@ -33,6 +33,7 @@ public class Paxos implements PaxosRMI, Runnable {
 
     ConcurrentHashMap<Integer, PeerState> v_decided = new ConcurrentHashMap<Integer, PeerState>();
     Semaphore semaphore = new Semaphore(1);
+    ReentrantLock done_lowest_lock;
 
     /**
      * Call the constructor to create a Paxos peer.
@@ -47,6 +48,7 @@ public class Paxos implements PaxosRMI, Runnable {
         this.mutex = new ReentrantLock();
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
+        this.done_lowest_lock = new ReentrantLock();
 
         n_done_lowest = new int[peers.length];
         for(int i = 0; i < n_done_lowest.length; i++) { n_done_lowest[i]=-1; }
@@ -169,7 +171,7 @@ public class Paxos implements PaxosRMI, Runnable {
                         }
                     }
                     // Now check if n done needs to be replaced
-                    //updateDoneLowest(r_prepare);
+                    updateDoneLowest(r_prepare);
                 } 
             }
             if (seq == 0) System.out.println(String.format("Theirs: %d, %s, Mine: %d", highest_n, highest_v, n_clock));
@@ -192,6 +194,7 @@ public class Paxos implements PaxosRMI, Runnable {
 
                     if (r_accept != null) {
                         if (r_accept.type == MessageType.ACCEPT_OK) num_accept++;
+                        updateDoneLowest(r_accept);
                     }
 
                 }
@@ -213,12 +216,26 @@ public class Paxos implements PaxosRMI, Runnable {
     }
     
     private void updateDoneLowest(Request req) {
+        done_lowest_lock.lock();
         for(int a=0; a < n_done_lowest.length; a++) {
             if(n_done_lowest[a] < req.n_done_lowest[a]) {
                 n_done_lowest[a] = req.n_done_lowest[a];
             }
-        } 
+        } done_lowest_lock.unlock();
+
     }
+
+    private void updateDoneLowest(Response res) {
+        done_lowest_lock.lock();
+        for(int a=0; a < n_done_lowest.length; a++) {
+            if(n_done_lowest[a] < res.n_done_lowest[a]) {
+                n_done_lowest[a] = res.n_done_lowest[a];
+            }
+        } 
+        done_lowest_lock.unlock();
+
+    }
+
 
     /*
      * ACCEPTOR
@@ -234,7 +251,7 @@ public class Paxos implements PaxosRMI, Runnable {
             );
         }
 
-        //updateDoneLowest(req);
+        updateDoneLowest(req);
 
         Response r;
         if (req.n_clock > v_decided.get(req.seq).n_p) {
@@ -258,7 +275,7 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for accept requests
     public Response Accept(Request req) {
-        //updateDoneLowest(req);
+        updateDoneLowest(req);
  
         Response r;
 
@@ -336,7 +353,10 @@ public class Paxos implements PaxosRMI, Runnable {
      * this peer.
      */
     public int Max() {
-        return -1;
+        int max = -1;
+        for(Integer state: v_decided.keySet()) {
+            if(max < state) max = state;
+        } return max;
     }
 
     /**
@@ -368,8 +388,10 @@ public class Paxos implements PaxosRMI, Runnable {
      * instances.
      */
     public int Min() {
+        done_lowest_lock.lock();
         int min=n_done_lowest[0];
         for(int i : n_done_lowest) { if(i < min) min = i;}
+        done_lowest_lock.unlock();
         return min + 1;
     }
 
