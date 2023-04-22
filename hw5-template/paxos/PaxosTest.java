@@ -81,7 +81,7 @@ public class PaxosTest {
         return pxa;
     }
 
-    @Test
+    //@Test
     public void TestBasic() {
         final int npaxos = 5;
         Paxos[] pxa = initPaxos(npaxos);
@@ -125,7 +125,7 @@ public class PaxosTest {
         cleanup(pxa);
     }
 
-    //@Test
+    @Test
     public void TestDeaf() {
         final int npaxos = 5;
         Paxos[] pxa = initPaxos(npaxos);

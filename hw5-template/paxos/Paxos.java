@@ -153,16 +153,13 @@ public class Paxos implements PaxosRMI, Runnable {
 
             // Send to all instances, check if receive ok from more than half of array length
             for (int i = 0; i < peers.length; i++) {
-
-                // Send prepare via RMI and look for OK response
-                Response r_prepare = Call("Prepare", request, i);
                 
-                if (r_prepare != null){
-                    // if r_prepare.n_a > highest_n: update highest_n, highest_v
+                Response r_prepare;
+                if (i == me) r_prepare = Prepare(request);
+                else r_prepare = Call("Prepare", request, i);
 
-                    // System.out.println(String.format("My clock (P%d): %d, Peer response (P%d): %s",
-                    // me, highest_n, i, r_prepare.toString()));
-
+                
+                if (r_prepare != null) {
                     if (r_prepare.type == MessageType.PREPARE_OK) {
                         num_prepare++;
                         if (r_prepare.n_a > highest_n) {
@@ -174,20 +171,24 @@ public class Paxos implements PaxosRMI, Runnable {
                     //updateDoneLowest(r_prepare);
                 } 
             }
-
+            if (seq == 0) System.out.println(String.format("Theirs: %d, %s, Mine: %d", highest_n, highest_v, n_clock));
+            
             // Check for majority OK, then move to accept
-            if (num_prepare > Integer.valueOf((peers.length + 1) / 2)) {
+            if (num_prepare >= (peers.length + 1) / 2) {
                 //If highest_n != -1 (invalid) -> Someone sent me a value to commit to
                 // Choose highest_v, else choose value
                 Object send_value;
 
                 if (highest_n != -1) send_value = highest_v;
                 else send_value = p_value;
-                //Accept request in case n and v have changed
                 Request a_request = new Request(p_seq, n_clock, send_value, n_done_lowest);
                 
                 for (int i = 0; i < peers.length; i++) {
-                    Response r_accept = Call("Accept", a_request, i);
+
+                    Response r_accept;
+                    if (i == me) r_accept = Accept(a_request);
+                    else r_accept = Call("Accept", a_request, i);
+
                     if (r_accept != null) {
                         if (r_accept.type == MessageType.ACCEPT_OK) num_accept++;
                     }
@@ -195,12 +196,13 @@ public class Paxos implements PaxosRMI, Runnable {
                 }
 
                 // Majority OK, move to decide
-                if (num_accept > Integer.valueOf((peers.length + 1)/ 2)) {
+                if (num_accept >= (peers.length + 1)/ 2) {
                     //System.out.println("We decided on: " + send_value.toString());
                     for (int i = 0; i < peers.length; i++) {
                     // Decide request in case n and v have changed
                         Request d_request = new Request(p_seq, n_clock, send_value, n_done_lowest);
-                        Call("Decide", d_request, i);
+                        if (i == me) Decide(d_request);
+                        else Call("Decide", d_request, i);
                         // Do something with min done value here
                     }
                 }
