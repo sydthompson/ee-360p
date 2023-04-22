@@ -6,6 +6,7 @@ import java.rmi.registry.Registry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.Semaphore;
 
 /**
  * This class is the main class you need to implement paxos instances.
@@ -20,30 +21,19 @@ public class Paxos implements PaxosRMI, Runnable {
 
     Registry registry;
     PaxosRMI stub;
-    
-    // Broadcast to peers once true
-    boolean decided = false;
-    
-    // Used by a process to generate unique proposal numbers when proposing values
-
-    // n represents a proposal timestamp
-    int n_clock,
-        n_p,
-        n_a,
-        n_done_highest;
 
     // v corresponds to the value to be proposed by this paxos instance
     int seq;
     Object value;
 
-    State state;
     AtomicBoolean dead,
                   unreliable;   // for testing
 
     int[] n_done_lowest;
 
     ConcurrentHashMap<Integer, PeerState> v_decided = new ConcurrentHashMap<Integer, PeerState>();
-    
+    Semaphore semaphore = new Semaphore(1);
+
     /**
      * Call the constructor to create a Paxos peer.
      * The hostnames of all the Paxos peers (including this one)
@@ -57,9 +47,6 @@ public class Paxos implements PaxosRMI, Runnable {
         this.mutex = new ReentrantLock();
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
-
-        n_a = n_p = n_done_highest = -1;
-        state = State.Pending;
 
         n_done_lowest = new int[peers.length];
         for(int i = 0; i < n_done_lowest.length; i++) { n_done_lowest[i]=-1; }
@@ -131,6 +118,10 @@ public class Paxos implements PaxosRMI, Runnable {
 
         //ignore Start() call if seq is less than min
         if(seq < Min()) return;
+        try {
+            semaphore.acquire();
+        } catch(Exception e) {
+        }
         this.seq = seq;
         this.value = value;
         new Thread(this).start();
@@ -141,18 +132,24 @@ public class Paxos implements PaxosRMI, Runnable {
      */
     @Override
     public void run() {
-        n_clock = me;
-        while (state != State.Decided && state != State.Forgotten) {
-            n_clock += peers.length;
-            if(isDead()) return;
+        // Peer versions
+        int p_seq = seq;
+        int n_clock = me;
+        Object p_value = value;
+        State p_state = State.Pending;
+        int highest_n = -1;
+        Object highest_v = null;
+        semaphore.release();
 
-            int highest_n = -1;
-            Object highest_v = null;
+        while (p_state == State.Pending) {
+            n_clock += peers.length;
+
+            if(isDead()) return;
 
             int num_prepare = 0, 
                 num_accept = 0;
 
-            Request request = new Request(seq, n_clock, value, n_done_lowest);
+            Request request = new Request(p_seq, n_clock, p_value, n_done_lowest);
 
             // Send to all instances, check if receive ok from more than half of array length
             for (int i = 0; i < peers.length; i++) {
@@ -162,31 +159,32 @@ public class Paxos implements PaxosRMI, Runnable {
                 
                 if (r_prepare != null){
                     // if r_prepare.n_a > highest_n: update highest_n, highest_v
-                    if (r_prepare.n_a > n_clock) {
-                        highest_n = r_prepare.n_a;
-                        highest_v = r_prepare.v_a;
-                    }
 
                     // System.out.println(String.format("My clock (P%d): %d, Peer response (P%d): %s",
                     // me, highest_n, i, r_prepare.toString()));
 
-                    if (r_prepare.type == MessageType.PREPARE_OK) num_prepare++;
-
+                    if (r_prepare.type == MessageType.PREPARE_OK) {
+                        num_prepare++;
+                        if (r_prepare.n_a > highest_n) {
+                            highest_n = r_prepare.n_a;
+                            highest_v = r_prepare.v_a;
+                        }
+                    }
                     // Now check if n done needs to be replaced
                     //updateDoneLowest(r_prepare);
                 } 
             }
 
             // Check for majority OK, then move to accept
-            if (num_prepare > Integer.valueOf(peers.length / 2)) {
+            if (num_prepare > Integer.valueOf((peers.length + 1) / 2)) {
                 //If highest_n != -1 (invalid) -> Someone sent me a value to commit to
                 // Choose highest_v, else choose value
                 Object send_value;
 
                 if (highest_n != -1) send_value = highest_v;
-                else send_value = value;
+                else send_value = p_value;
                 //Accept request in case n and v have changed
-                Request a_request = new Request(seq, n_clock, send_value, n_done_lowest);
+                Request a_request = new Request(p_seq, n_clock, send_value, n_done_lowest);
                 
                 for (int i = 0; i < peers.length; i++) {
                     Response r_accept = Call("Accept", a_request, i);
@@ -197,18 +195,13 @@ public class Paxos implements PaxosRMI, Runnable {
                 }
 
                 // Majority OK, move to decide
-                if (num_accept > Integer.valueOf(peers.length / 2)) {
-                    System.out.println("Decision reached: " + send_value.toString());
+                if (num_accept > Integer.valueOf((peers.length + 1)/ 2)) {
+                    //System.out.println("We decided on: " + send_value.toString());
                     for (int i = 0; i < peers.length; i++) {
                     // Decide request in case n and v have changed
-                        Request d_request = new Request(
-                                seq, 
-                                n_clock,
-                                send_value,
-                                n_done_lowest);
-                        for (int j = 0; j < peers.length; j++) {
-                            Call("Decide", d_request, i);
-                        }
+                        Request d_request = new Request(p_seq, n_clock, send_value, n_done_lowest);
+                        Call("Decide", d_request, i);
+                        // Do something with min done value here
                     }
                 }
             } 
@@ -235,7 +228,7 @@ public class Paxos implements PaxosRMI, Runnable {
                 -1,
                 null,
                 null,
-                state.Pending
+                State.Pending
             );
             v_decided.put(seq, ps);
         }
@@ -244,7 +237,6 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for prepare requests
     public Response Prepare(Request req) {
-        if (req.seq != seq) return null;
 
         PeerState ps = getState(req.seq);
 
@@ -257,23 +249,21 @@ public class Paxos implements PaxosRMI, Runnable {
             r = new Response(
                 MessageType.PREPARE_OK,
                 ps.n_a,
-                ps.value,
+                ps.v_a,
                 n_done_lowest);
         } else {
             // PREPARE REJECT
             r = new Response(
                 MessageType.PREPARE_REJECT, 
                 ps.n_a,
-                ps.value,
+                ps.v_a,
                 n_done_lowest);
         }
-        v_decided.put(req.seq, ps);
         return r;
     }
 
     // RMI Handler for accept requests
     public Response Accept(Request req) {
-        if (req.seq != seq) return null;
         PeerState ps = getState(req.seq);
         //updateDoneLowest(req);
  
@@ -288,17 +278,16 @@ public class Paxos implements PaxosRMI, Runnable {
             r = new Response(
                 MessageType.ACCEPT_OK, 
                 ps.n_a,
-                ps.value,
+                ps.v_a,
                 n_done_lowest);
         } else {
             // ACCEPT REJECT
             r = new Response(
                 MessageType.ACCEPT_REJECT,
                 ps.n_a,
-                ps.value,
+                ps.v_a,
                 n_done_lowest);
         }
-        v_decided.put(req.seq, ps);
         return r;
     }
 
@@ -308,7 +297,6 @@ public class Paxos implements PaxosRMI, Runnable {
 
     // RMI Handler for decide requests
     public Response Decide(Request req) {
-        if (req.seq != seq) return null;
         PeerState ps = getState(seq);
         //updateDoneLowest(req);
         ps.state = State.Decided;
@@ -336,7 +324,11 @@ public class Paxos implements PaxosRMI, Runnable {
         int min_sequence = Min();
         n_done_lowest[me]=seq;
         // find out which 
-        if(this.seq < min_sequence) this.state = State.Forgotten;
+        if(this.seq < min_sequence) {
+            PeerState ps = v_decided.get(seq);
+            ps.state = State.Forgotten;
+            v_decided.put(seq, ps);
+        }
         //TODO send the highest Done argument supplied by local application
         // System.out.println("After done: " + help(n_done_lowest));
     }
@@ -355,7 +347,7 @@ public class Paxos implements PaxosRMI, Runnable {
      * this peer.
      */
     public int Max() {
-        return n_p;
+        return -1;
     }
 
     /**
@@ -410,7 +402,7 @@ public class Paxos implements PaxosRMI, Runnable {
         // }
 
         PeerState ps = getState(seq);
-        if (ps == null) return new retStatus(state.Pending, null);
+        if (ps == null) return new retStatus(State.Pending, null);
 
         return new retStatus(ps.state, ps.value);
     }
